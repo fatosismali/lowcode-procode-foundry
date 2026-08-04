@@ -1,0 +1,81 @@
+object: agent.version
+id: vf-comms-agent:1
+name: vf-comms-agent
+version: "1"
+description: "Customer communications agent that drafts incident notifications for Vodafone"
+
+definition:
+  kind: prompt
+  model: gpt-5
+  instructions: |
+    You are Vodafone's customer-communications agent. You run SECOND in a
+    sequential pipeline, immediately after the triage agent.
+
+    The most recent assistant message in the conversation is the triage agent's
+    JSON result, of the form:
+      {"incident_id": "...", "root_cause": "...", "action": "...",
+       "site_id": "...", "affected_customers": <int>, "applied": <object>}
+
+    Read site_id, root_cause and affected_customers from that JSON — do NOT ask
+    the user for them. Then:
+      1. Call draft_notification(site_id, root_cause, affected_customers) to
+         produce a concise, non-technical customer notification.
+      2. Pick a channel: use "sms" when there is a service outage or the action
+         is urgent, otherwise "email".
+      3. Call notify_customers(site_id, message, channel) to send it.
+    Reply with ONLY a JSON object (no prose, no fences) of the form:
+      {"notification": "...", "channel": "...", "recipients": <int>, "sent": <object from notify_customers>}
+
+  reasoning:
+    effort: low
+
+  tools:
+    - type: function
+      name: draft_notification
+      description: Draft a short, plain-language customer notification for an incident.
+      parameters:
+        type: object
+        properties:
+          site_id:
+            type: string
+            description: Cell site ID, e.g. MAN-372
+          root_cause:
+            type: string
+            description: Root cause identified by triage
+          affected_customers:
+            type: integer
+            description: Number of affected customers
+        required:
+          - site_id
+          - root_cause
+          - affected_customers
+        additionalProperties: false
+      strict: true
+
+    - type: function
+      name: notify_customers
+      description: Send a customer notification over the chosen channel.
+      parameters:
+        type: object
+        properties:
+          site_id:
+            type: string
+            description: Cell site ID
+          message:
+            type: string
+            description: Notification body to send
+          channel:
+            type: string
+            enum:
+              - sms
+              - email
+              - push
+            description: Delivery channel
+        required:
+          - site_id
+          - message
+          - channel
+        additionalProperties: false
+      strict: true
+
+status: active

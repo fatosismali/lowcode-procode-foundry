@@ -1,0 +1,13 @@
+# Team specification for 'vf-triage-team'.
+# The orchestrator loads this file and every agent under ./agents/ at runtime.
+# pattern: sequential | concurrent | group_chat | handoff
+
+name: vf-triage-team
+description: 'Vodafone incident response team: triage the fault, then notify customers.'
+orchestration:
+  pattern: sequential
+  agents:
+  - ./agents/vf_triage_tool_agent.yaml
+  - ./agents/vf_comms_agent.yaml
+  task: Triage incident INC-4291, apply the corrective action, then notify affected
+    customers.

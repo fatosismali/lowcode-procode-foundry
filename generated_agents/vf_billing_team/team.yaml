@@ -1,0 +1,17 @@
+# Team specification for 'vf-billing-team'.
+# The orchestrator loads this file and every agent under ./agents/ at runtime.
+# pattern: sequential | concurrent | group_chat | handoff
+
+name: vf-billing-team
+description: 'Vodafone billing customer-support team: resolve account, investigate
+  billing evidence, respond to the customer.'
+orchestration:
+  pattern: sequential
+  agents:
+  - ./agents/vf_billing_profile_agent.yaml
+  - ./agents/vf_billing_investigation_agent.yaml
+  - ./agents/vf_billing_response_agent.yaml
+  task: '{"userQuery": "How much is my latest bill and has it been paid?", "selectedAccountReference":
+    null}
+
+    '

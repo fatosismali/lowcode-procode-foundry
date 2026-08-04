@@ -1,0 +1,114 @@
+"""Base classes and utilities for tool implementations."""
+
+import asyncio
+import logging
+from abc import ABC, abstractmethod
+from functools import wraps
+from typing import Any, Callable, Dict, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class ToolBase(ABC):
+    """Abstract base class for tool implementations."""
+    
+    @abstractmethod
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool."""
+        pass
+
+
+class ToolExecutor:
+    """Manages tool execution with timeout and error handling."""
+    
+    def __init__(self, timeout_seconds: int = 30):
+        """
+        Initialize executor.
+        
+        Args:
+            timeout_seconds: Maximum execution time
+        """
+        self.timeout_seconds = timeout_seconds
+    
+    async def execute(
+        self,
+        func: Callable,
+        *args,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Execute a tool function with timeout and error handling.
+        
+        Args:
+            func: Async function to execute
+            *args: Positional arguments
+            **kwargs: Keyword arguments
+            
+        Returns:
+            Standardized response dictionary
+        """
+        try:
+            result = await asyncio.wait_for(
+                func(*args, **kwargs),
+                timeout=self.timeout_seconds
+            )
+            return {"status": "success", "data": result}
+        except asyncio.TimeoutError:
+            logger.error(f"Tool execution timeout after {self.timeout_seconds}s")
+            return {"status": "error", "error": f"Timeout after {self.timeout_seconds}s"}
+        except Exception as e:
+            logger.error(f"Tool execution error: {e}", exc_info=True)
+            return {"status": "error", "error": str(e)}
+
+
+def tool_handler(func: Callable) -> Callable:
+    """
+    Decorator for tool functions - adds automatic error handling and logging.
+    
+    Args:
+        func: Async tool function
+        
+    Returns:
+        Decorated function
+    """
+    @wraps(func)
+    async def wrapper(*args, **kwargs) -> Dict[str, Any]:
+        tool_name = func.__name__
+        logger.info(f"Executing tool: {tool_name}")
+        
+        try:
+            result = await func(*args, **kwargs)
+            logger.info(f"✓ Tool {tool_name} completed successfully")
+            return result
+        except Exception as e:
+            logger.error(f"✗ Tool {tool_name} failed: {e}", exc_info=True)
+            return {"status": "error", "error": str(e), "tool": tool_name}
+    
+    return wrapper
+
+
+class ToolRegistry:
+    """Registry for managing available tools."""
+    
+    _tools: Dict[str, Callable] = {}
+    
+    @classmethod
+    def register(cls, name: str, func: Callable) -> None:
+        """Register a tool."""
+        cls._tools[name] = func
+        logger.debug(f"Registered tool: {name}")
+    
+    @classmethod
+    def get(cls, name: str) -> Optional[Callable]:
+        """Get a tool by name."""
+        return cls._tools.get(name)
+    
+    @classmethod
+    def get_all(cls) -> Dict[str, Callable]:
+        """Get all registered tools."""
+        return cls._tools.copy()
+    
+    @classmethod
+    def list_tools(cls) -> list:
+        """List all registered tool names."""
+        return list(cls._tools.keys())
