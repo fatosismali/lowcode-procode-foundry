@@ -1,0 +1,66 @@
+# Multi-stage Dockerfile for {{agent_name}} Agent
+# Build: docker build -t {{agent_slug}}:latest .
+# Run: docker run -e FOUNDRY_PROJECT_CONNECTION_STRING=... {{agent_slug}}:latest
+
+# ==============================================================================
+# Stage 1: Builder
+# ==============================================================================
+FROM python:3.11-slim as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY . .
+
+# Build/compile (if needed)
+RUN pip install --no-cache-dir -e .
+
+# ==============================================================================
+# Stage 2: Runtime
+# ==============================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN useradd -m -u 1000 agent && chown -R agent:agent /app
+
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY --chown=agent:agent . /app
+
+# Switch to non-root user
+USER agent
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Environment
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV LOG_LEVEL=INFO
+
+# Run the agent
+ENTRYPOINT ["python", "-m", "src.orchestrator"]
+CMD []

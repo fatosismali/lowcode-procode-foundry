@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "foundry-yaml-to-sdk"
+version = "1.0.0"
+description = "Transform Foundry YAML agent definitions into Python Agent Framework SDK implementations"
+readme = "README_TEMPLATE.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Vodafone AI Team", email = "ai@vodafone.com"}
+]
+keywords = ["agent", "framework", "foundry", "yaml", "codegen", "agent-framework"]
+
+dependencies = [
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.1.0",
+    "click>=8.1.0",
+    "colorama>=0.4.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Vodafone/foundry-yaml-to-sdk"
+Repository = "https://github.com/Vodafone/foundry-yaml-to-sdk.git"
+Documentation = "https://github.com/Vodafone/foundry-yaml-to-sdk/blob/main/README_TEMPLATE.md"
+
+[project.scripts]
+foundry-yaml-to-sdk = "yaml_to_sdk.__main__:main"
+
+[tool.hatch.version]
+path = "yaml_to_sdk/__init__.py"
+pattern = '__version__ = "(?P<version>[^"]+)"'
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = ["-v", "--tb=short"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+check_untyped_defs = true

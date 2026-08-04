@@ -1,0 +1,78 @@
+"""
+Type Models for {{agent_name}} Agent
+
+Auto-generated Pydantic models for type-safe tool I/O.
+Provides request/response types for all tools and ensures strict validation.
+"""
+
+from typing import Optional, Any, Dict, List
+from pydantic import BaseModel, Field
+
+
+{%- for tool in function_tools %}
+
+class {{tool.class_name}}Request(BaseModel):
+    """
+    Request model for {{tool.name}} tool.
+    
+    {{tool.description}}
+    """
+{%- for param_name in tool.required_params %}
+{%- set param = tool.parameters.properties[param_name] %}
+    {{param_name}}: {{param.type}} = Field(
+        ...,
+        description="{{param.description}}"
+    )
+{%- endfor %}
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+{%- for param_name in tool.required_params %}
+                "{{param_name}}": "example_value",
+{%- endfor %}
+            }
+        }
+
+
+class {{tool.class_name}}Response(BaseModel):
+    """
+    Response model for {{tool.name}} tool.
+    """
+    status: str = Field(
+        default="success",
+        description="Status of tool execution (success/error)"
+    )
+    data: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Tool output data"
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Error message if execution failed"
+    )
+
+{%- endfor %}
+
+
+# Type aliases for common patterns
+ToolRequest = Dict[str, Any]
+ToolResponse = Dict[str, Any]
+
+
+def parse_tool_response(response: Any) -> Dict[str, Any]:
+    """
+    Parse tool response into standard format.
+    
+    Args:
+        response: Raw tool response
+        
+    Returns:
+        Standardized response dictionary
+    """
+    if isinstance(response, dict):
+        return response
+    elif isinstance(response, BaseModel):
+        return response.model_dump()
+    else:
+        return {"data": response}

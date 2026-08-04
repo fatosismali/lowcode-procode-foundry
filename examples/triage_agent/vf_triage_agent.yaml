@@ -1,0 +1,137 @@
+metadata:
+  description: "Vodafone network-fault triage agent for automated incident diagnosis and remediation"
+  modified_at: "1779097148"
+  microsoft.voice-live.enabled: "false"
+
+object: agent.version
+id: vf-triage-tool-agent:2
+name: vf-triage-tool-agent
+version: "2"
+description: "Network fault triage and remediation agent for Vodafone"
+
+created_at: 1779097149
+
+definition:
+  kind: prompt
+  model: gpt-5
+  instructions: |
+    You are Vodafone's network-fault triage agent. For each incident the user names, you must:
+      1. Call get_incident to look up the site and summary.
+      2. Call fetch_telemetry on that site.
+      3. Call fetch_customer_impact on that site.
+      4. Decide the root cause using these rules:
+         - reachable=false → backhaul_outage
+         - prb_utilisation>0.85 → ran_congestion
+         - handover_failure_rate>0.10 → neighbour_misconfig
+         - otherwise → no_fault
+      5. Pick ONE corrective action using this mapping:
+         ran_congestion→reroute_traffic, backhaul_outage→dispatch_engineer, neighbour_misconfig→restart_enodeb, no_fault→no_action.
+      6. Call apply_change with the chosen action. The user is the approver; pass approved=true and approver='foundry-tools-demo'.
+      7. Reply with ONLY a JSON object (no prose, no fences) of the form:
+         {"incident_id": "...", "root_cause": "...", "action": "...", "site_id": "...", "affected_customers": <int>, "applied": <object from apply_change>}
+
+  reasoning:
+    effort: low
+
+  tools:
+    - type: function
+      name: get_incident
+      description: Look up an ITSM incident by ID and return its site and summary.
+      parameters:
+        type: object
+        properties:
+          incident_id:
+            type: string
+            description: Incident ID, e.g. INC-4291
+        required:
+          - incident_id
+        additionalProperties: false
+      strict: true
+
+    - type: function
+      name: fetch_telemetry
+      description: Fetch the latest RAN telemetry snapshot for a cell site.
+      parameters:
+        type: object
+        properties:
+          site_id:
+            type: string
+            description: Cell site ID, e.g. MAN-372
+        required:
+          - site_id
+        additionalProperties: false
+      strict: true
+
+    - type: function
+      name: fetch_customer_impact
+      description: Return CRM impact (affected customers by tier) for a cell site.
+      parameters:
+        type: object
+        properties:
+          site_id:
+            type: string
+            description: Cell site ID, e.g. MAN-372
+        required:
+          - site_id
+        additionalProperties: false
+      strict: true
+
+    - type: function
+      name: apply_change
+      description: Apply a corrective change to the network. Refuses unless approved=true. Use this once you have decided the action.
+      parameters:
+        type: object
+        properties:
+          incident_id:
+            type: string
+            description: ITSM incident ID
+          site_id:
+            type: string
+            description: Cell site ID
+          action:
+            type: string
+            enum:
+              - restart_enodeb
+              - reroute_traffic
+              - dispatch_engineer
+              - no_action
+            description: Corrective action to apply
+          rationale:
+            type: string
+            description: Reason for choosing this action
+          approved:
+            type: boolean
+            description: Must be true to apply change
+          approver:
+            type: string
+            description: Approver identifier
+        required:
+          - incident_id
+          - site_id
+          - action
+          - rationale
+          - approved
+          - approver
+        additionalProperties: false
+      strict: true
+
+    - type: mcp
+      server_label: kb_regulationpolciies_ziw96
+      server_url: https://msagthack-search-mzloe6z4nnwoc.search.windows.net/knowledgebases/regulationpolciies/mcp?api-version=2025-11-01-Preview
+      project_connection_id: kb-regulationpolciies-ziw96
+
+status: active
+
+instance_identity:
+  principal_id: 48b5888a-4b9c-46cd-9576-b68302165a1e
+  client_id: 48b5888a-4b9c-46cd-9576-b68302165a1e
+
+blueprint:
+  principal_id: 6f481b3c-d537-499b-9a3b-a574692d032f
+  client_id: 01df7427-837f-428d-8507-8b056f4df4a7
+
+blueprint_reference:
+  type: ManagedAgentIdentityBlueprint
+  blueprint_id: vf-triage-tool-agent-d39ba
+
+agent_guid: d39ba554-7743-4bee-9a4f-0d593cd3104b

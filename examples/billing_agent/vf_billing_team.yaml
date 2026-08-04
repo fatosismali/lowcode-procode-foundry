@@ -1,0 +1,36 @@
+# Multi-agent orchestration ("team") definition for the Vodafone billing
+# customer-support pipeline.
+#
+# Pattern: sequential (Microsoft Agent Framework SequentialBuilder).
+# Each agent runs in the order listed and receives the previous agent's
+# JSON output through the conversation.
+#
+# Data contract:
+#   1) vf-billing-profile-agent
+#        Resolves the customer's billing profile.
+#        Emits: {"workflowStatus": "ACCOUNT_RESOLVED", ...}
+#               or ACCOUNT_SELECTION_REQUIRED / PROFILE_RETRIEVAL_FAILED.
+#   2) vf-billing-investigation-agent
+#        Reads billingContext from (1), routes the intent to a single
+#        get_billing_data(...) call, produces structured evidence.
+#        Emits: {"workflowStatus": "BILLING_EVIDENCE_READY", ...}
+#               or BILLING_RETRIEVAL_FAILED.
+#   3) vf-billing-response-agent
+#        Reads the evidence from (2) and writes the final customer answer.
+#        Emits: plain customer-facing text (no JSON).
+
+name: vf-billing-team
+description: "Vodafone billing customer-support team: resolve account, investigate billing evidence, respond to the customer."
+
+orchestration:
+  pattern: sequential
+
+  # The initial task handed to the FIRST agent. The customer's real message
+  # should be substituted at runtime — this default is only a demo prompt.
+  task: |
+    {"userQuery": "How much is my latest bill and has it been paid?", "selectedAccountReference": null}
+
+  agents:
+    - ./vf_billing_profile_agent.yaml         # 1) resolve billing profile
+    - ./vf_billing_investigation_agent.yaml   # 2) gather billing evidence
+    - ./vf_billing_response_agent.yaml        # 3) draft the customer answer

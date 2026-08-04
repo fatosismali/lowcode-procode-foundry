@@ -1,0 +1,17 @@
+# Foundry YAML → Agent Framework SDK Generator
+# Core dependencies for the template generator itself
+
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+pyyaml>=6.0
+jinja2>=3.1.0
+click>=8.1.0
+colorama>=0.4.6
+
+# Optional: Development
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.0.0
+ruff>=0.1.0

@@ -1,0 +1,395 @@
+# {{agent_name}} Agent
+
+**{{agent_description|default('AI Agent for automated task execution using Microsoft Agent Framework')}}**
+
+> This agent was auto-generated from a Foundry YAML definition (`{{agent_id}}`).
+> It implements the Microsoft Agent Framework SDK with full support for tool orchestration,
+> error handling, logging, and deployment.
+
+## Overview
+
+This is a production-ready Python implementation of your agent using:
+- **Agent Framework SDK** — Microsoft's enterprise agent framework (v{{agent_framework_version}})
+- **Azure Foundry Integration** — Native Foundry credentials and model access
+- **Pydantic Models** — Type-safe tool I/O with validation
+- **Async/Await** — Full async support for scalable execution
+- **Structured Logging** — JSON-structured logs for observability
+- **OpenTelemetry Ready** — Instrumentation for distributed tracing
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  orchestrator.py                                │
+│  ├── {{agent_class}} (main agent)            │
+│  └── Tool Binding & Invocation                  │
+├─────────────────────────────────────────────────┤
+│  models.py                                      │
+│  └── Pydantic request/response models           │
+├─────────────────────────────────────────────────┤
+│  tools/                                         │
+│  ├── __init__.py (tool base classes)            │
+{%- for tool in function_tools %}
+│  └── {{tool.safe_name}}.py ({{tool.name}})   │
+{%- endfor %}
+├─────────────────────────────────────────────────┤
+│  config.py                                      │
+│  └── Configuration & environment management    │
+└─────────────────────────────────────────────────┘
+```
+
+## Quick Start
+
+### 1. Prerequisites
+
+- Python 3.11+
+- Azure Subscription with Foundry project
+- Foundry project connection string
+- pip or uv package manager
+
+### 2. Installation
+
+```bash
+# Clone/extract this project
+cd {{agent_slug}}
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Or with uv (faster):
+uv sync
+```
+
+### 3. Configuration
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your Foundry credentials
+nano .env
+```
+
+Required environment variables:
+- `FOUNDRY_PROJECT_CONNECTION_STRING` — Your Foundry project connection string
+- `MODEL_NAME` — Model to use (default: {{model}})
+
+### 4. Run Locally
+
+```bash
+# Interactive mode
+python src/orchestrator.py
+
+# Single message
+python src/orchestrator.py "Your message here"
+
+# With debugging
+LOG_LEVEL=DEBUG python src/orchestrator.py
+```
+
+### 5. Run Tests
+
+```bash
+pytest tests/ -v
+# or with coverage:
+pytest tests/ --cov=src --cov-report=html
+```
+
+## Tools
+
+The agent includes the following tools:
+
+{%- for tool in function_tools %}
+
+### {{tool.name}}
+
+**Description:** {{tool.description}}
+
+**Parameters:**
+{%- for param in tool.required_params %}
+- `{{param}}` — {{tool.parameters.properties[param].description}}
+{%- endfor %}
+
+**Type-Safe Model:**
+```python
+from src.models import {{tool.class_name}}Request, {{tool.class_name}}Response
+
+request = {{tool.class_name}}Request(
+{%- for param in tool.required_params %}
+    {{param}}="value"{{ "," if not loop.last }}
+{%- endfor %}
+)
+response = await agent._execute_{{tool.safe_name}}(request)
+```
+
+{%- endfor %}
+
+{%- if has_mcp_tools %}
+
+## Knowledge Bases (MCP Servers)
+
+The agent is connected to the following knowledge bases via MCP:
+
+{%- for mcp_tool in mcp_tools %}
+
+### {{mcp_tool.server_label}}
+
+- **Endpoint:** {{mcp_tool.server_url}}
+- **Connection ID:** {{mcp_tool.project_connection_id}}
+
+This knowledge base is available for retrieval and grounding.
+
+{%- endfor %}
+
+{%- endif %}
+
+## Configuration
+
+### Environment Variables
+
+See `.env.example` for all available configuration options:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FOUNDRY_PROJECT_CONNECTION_STRING` | *required* | Foundry project connection |
+| `MODEL_NAME` | {{model}} | Model for agent |
+| `REASONING_EFFORT` | {{reasoning_effort}} | Reasoning effort: low/medium/high |
+| `LOG_LEVEL` | INFO | Logging level |
+| `TOOL_TIMEOUT_SECONDS` | 30 | Tool execution timeout |
+| `MAX_TOOL_CALLS` | 10 | Max tool calls per turn |
+
+### Programmatic Configuration
+
+```python
+from src.config import AgentConfig
+from src.orchestrator import {{agent_class}}
+
+# Load from environment
+config = AgentConfig.from_env()
+
+# Or create manually
+config = AgentConfig(
+    foundry_project_connection_string="...",
+    model_name="{{model}}",
+    reasoning_effort="{{reasoning_effort}}",
+)
+
+agent = {{agent_class}}(config=config)
+```
+
+## Development
+
+### Project Structure
+
+```
+{{agent_slug}}/
+├── src/
+│   ├── __init__.py
+│   ├── orchestrator.py      # Main agent entry point
+│   ├── models.py            # Pydantic models for type safety
+│   ├── config.py            # Configuration management
+│   └── tools/               # Tool implementations
+│       └── __init__.py
+├── tests/
+│   ├── __init__.py
+│   └── test_agent.py        # Pytest test suite
+├── pyproject.toml           # Project metadata & dependencies
+├── requirements.txt         # Frozen dependencies
+├── .env.example             # Environment template
+├── Dockerfile               # Container build
+├── README.md                # This file
+└── .gitignore
+```
+
+### Running Tests
+
+```bash
+# All tests
+pytest tests/ -v
+
+# Specific test
+pytest tests/test_agent.py::TestAgentInitialization -v
+
+# With coverage
+pytest tests/ --cov=src --cov-report=term-missing
+
+# Watch mode (requires pytest-watch)
+ptw tests/
+```
+
+### Code Style
+
+This project uses:
+- **Black** — Code formatting
+- **isort** — Import sorting
+- **mypy** — Type checking
+- **ruff** — Linting
+
+```bash
+# Format code
+black src/ tests/
+
+# Sort imports
+isort src/ tests/
+
+# Type check
+mypy src/
+
+# Lint
+ruff check src/ tests/
+```
+
+### Adding New Tools
+
+1. Create tool definition in `src/tools/`:
+   ```python
+   from src.models import MyToolRequest, MyToolResponse
+   
+   async def my_tool(param: str) -> dict:
+       """Tool implementation"""
+       return {"result": param}
+   ```
+
+2. Add to `orchestrator.py`:
+   ```python
+   @Tool(name="my_tool", description="...")
+   async def my_tool(param: str):
+       request = MyToolRequest(param=param)
+       return await self._execute_my_tool(request)
+   ```
+
+3. Add type models to `models.py`
+
+4. Add tests to `tests/test_agent.py`
+
+## Deployment
+
+### Docker Build
+
+```bash
+# Build image
+docker build -t {{agent_slug}}:latest .
+
+# Run with environment
+docker run -e FOUNDRY_PROJECT_CONNECTION_STRING=... {{agent_slug}}:latest
+```
+
+### Deploy to Foundry
+
+```bash
+# Build and push to ACR
+az acr build --registry <acr> \
+  --image {{agent_slug}}:latest \
+  --file Dockerfile .
+
+# Deploy agent
+azd ai agent deploy
+```
+
+### Azure Container Apps
+
+```bash
+# Deploy to ACA
+az containerapp create \
+  --resource-group <rg> \
+  --name {{agent_slug}} \
+  --image {{agent_slug}}:latest \
+  --environment <env> \
+  --env-vars FOUNDRY_PROJECT_CONNECTION_STRING=...
+```
+
+## Monitoring & Observability
+
+### Logging
+
+The agent uses structured logging. Control with `LOG_LEVEL`:
+
+```bash
+# Debug level
+LOG_LEVEL=DEBUG python src/orchestrator.py
+```
+
+Log output:
+```json
+{
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "INFO",
+  "logger": "orchestrator.{{agent_class}}",
+  "message": "Executing tool: get_incident",
+  "request": {...}
+}
+```
+
+### OpenTelemetry Tracing
+
+Enable distributed tracing:
+
+```bash
+ENABLE_TRACING=true \
+APPINSIGHTS_CONNECTION_STRING=... \
+python src/orchestrator.py
+```
+
+Traces are sent to Application Insights for analysis.
+
+## Troubleshooting
+
+### 401 Unauthorized
+
+**Cause:** Azure authentication failure or invalid Foundry connection string.
+
+**Solution:**
+```bash
+# Verify Azure login
+az account show
+
+# Verify Foundry connection string format
+echo $FOUNDRY_PROJECT_CONNECTION_STRING
+# Should be: https://<project>.projects.ai.azure.com/<subscription>/resourceGroups/<rg>/providers/Microsoft.AI/projects/<project>?auth=...
+```
+
+### Tool Timeout
+
+**Cause:** Tool execution exceeds `TOOL_TIMEOUT_SECONDS`
+
+**Solution:** Increase timeout in `.env`:
+```bash
+TOOL_TIMEOUT_SECONDS=60
+```
+
+### Model Not Found
+
+**Cause:** Model not deployed in Foundry project
+
+**Solution:**
+```bash
+# List available models
+az ai project list-models --resource-group <rg> --name <project>
+
+# Update MODEL_NAME in .env
+```
+
+## Related Resources
+
+- [Agent Framework Documentation](https://github.com/microsoft/agent-framework)
+- [Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio)
+- [Pydantic Validation](https://docs.pydantic.dev/)
+- [Azure Identity](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/identity/azure-identity)
+
+## Support
+
+For issues or questions:
+1. Check [Troubleshooting](#troubleshooting) section
+2. Review tool error messages and logs
+3. Open an issue in your project repository
+
+## License
+
+MIT - See LICENSE file
+
+---
+
+**Generated from:** `{{agent_id}}`  
+**Agent Version:** {{agent_version}}  
+**Model:** {{model}}  
+**Reasoning Effort:** {{reasoning_effort}}

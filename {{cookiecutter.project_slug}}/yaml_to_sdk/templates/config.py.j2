@@ -1,0 +1,194 @@
+"""
+Configuration and Environment Management for {{agent_name}} Agent
+
+Loads configuration from environment variables and handles secrets.
+Supports both local development and Foundry deployment.
+"""
+
+import os
+from typing import Optional
+from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator
+
+
+class AgentConfig(BaseSettings):
+    """
+    Configuration for {{agent_name}} agent.
+    
+    Loads settings from environment variables with the following precedence:
+    1. Environment variables
+    2. .env file (via pydantic-settings)
+    3. Defaults specified here
+    """
+    
+    # Foundry Configuration
+    foundry_project_connection_string: str = Field(
+        ...,
+        description="Foundry project connection string (from Azure portal)"
+    )
+    
+    # Model Configuration
+    model_name: str = Field(
+        default="{{model}}",
+        description="Model name for agent (e.g., gpt-5, gpt-4)"
+    )
+    
+    model_deployment_id: Optional[str] = Field(
+        default=None,
+        description="Azure OpenAI deployment ID (if using Azure deployment)"
+    )
+    
+    model_endpoint: Optional[str] = Field(
+        default=None,
+        description="Model endpoint URL (for cross-resource invocation)"
+    )
+    
+    # Reasoning Configuration
+    reasoning_effort: str = Field(
+        default="{{reasoning_effort}}",
+        description="Reasoning effort level: low, medium, high"
+    )
+    
+    # Tool Configuration
+{%- for tool in function_tools %}
+    {{tool.safe_name}}_enabled: bool = Field(
+        default=True,
+        description="Enable/disable {{tool.name}} tool"
+    )
+{%- endfor %}
+
+{%- if has_mcp_tools %}
+    # MCP Server Configuration
+{%- for mcp_tool in mcp_tools %}
+    {{mcp_tool.safe_label}}_url: Optional[str] = Field(
+        default=None,
+        description="{{mcp_tool.server_label}} MCP server URL"
+    )
+    {{mcp_tool.safe_label}}_project_connection_id: Optional[str] = Field(
+        default=None,
+        description="Foundry project connection ID for {{mcp_tool.project_connection_id}}"
+    )
+{%- endfor %}
+
+{%- endif %}
+    
+    # Logging Configuration
+    log_level: str = Field(
+        default="INFO",
+        description="Logging level: DEBUG, INFO, WARNING, ERROR"
+    )
+    
+    enable_tracing: bool = Field(
+        default=False,
+        description="Enable OpenTelemetry tracing"
+    )
+    
+    # Agent Identity (for hosted agents)
+{%- if instance_principal_id %}
+    agent_principal_id: str = Field(
+        default="{{instance_principal_id}}",
+        description="Managed identity principal ID for agent"
+    )
+{%- endif %}
+    
+{%- if instance_client_id %}
+    agent_client_id: str = Field(
+        default="{{instance_client_id}}",
+        description="Managed identity client ID for agent"
+    )
+{%- endif %}
+    
+    # Timeouts and Limits
+    tool_timeout_seconds: int = Field(
+        default=30,
+        description="Timeout for individual tool execution"
+    )
+    
+    conversation_timeout_seconds: int = Field(
+        default=300,
+        description="Timeout for full conversation"
+    )
+    
+    max_tool_calls: int = Field(
+        default=10,
+        description="Maximum number of tool calls per turn"
+    )
+    
+    class Config:
+        # Load from .env file if it exists
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        # Allow extra fields from environment
+        extra = "allow"
+
+    @field_validator('log_level')
+    @classmethod
+    def validate_log_level(cls, v):
+        """Validate log level."""
+        valid_levels = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
+        if v.upper() not in valid_levels:
+            raise ValueError(f"Invalid log level: {v}")
+        return v.upper()
+
+    @field_validator('reasoning_effort')
+    @classmethod
+    def validate_reasoning_effort(cls, v):
+        """Validate reasoning effort level."""
+        valid_efforts = {'low', 'medium', 'high'}
+        if v.lower() not in valid_efforts:
+            raise ValueError(f"Invalid reasoning effort: {v}")
+        return v.lower()
+
+    @classmethod
+    def from_env(cls) -> "AgentConfig":
+        """
+        Load configuration from environment.
+        
+        Returns:
+            AgentConfig instance
+            
+        Raises:
+            ValueError: If required environment variables are missing
+        """
+        try:
+            return cls()
+        except Exception as e:
+            raise ValueError(
+                f"Failed to load configuration from environment: {e}\n"
+                f"Please ensure all required environment variables are set.\n"
+                f"See .env.example for required variables."
+            )
+
+    def get_model_config(self) -> dict:
+        """Get model-specific configuration."""
+        config = {
+            "model": self.model_name,
+            "reasoning_effort": self.reasoning_effort,
+        }
+        
+        if self.model_deployment_id:
+            config["deployment_id"] = self.model_deployment_id
+        
+        if self.model_endpoint:
+            config["endpoint"] = self.model_endpoint
+        
+        return config
+
+    def get_enabled_tools(self) -> list[str]:
+        """Get list of enabled tools."""
+        enabled = []
+{%- for tool in function_tools %}
+        if self.{{tool.safe_name}}_enabled:
+            enabled.append("{{tool.name}}")
+{%- endfor %}
+        return enabled
+
+    def __repr__(self) -> str:
+        """String representation (hides sensitive info)."""
+        return (
+            f"AgentConfig("
+            f"model={self.model_name}, "
+            f"reasoning_effort={self.reasoning_effort}, "
+            f"enabled_tools={self.get_enabled_tools()}"
+            f")"
+        )

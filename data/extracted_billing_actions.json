@@ -1,0 +1,1678 @@
+[
+  {
+    "type": "standard",
+    "steps": [
+      {
+        "step": "step_417",
+        "type": "standard",
+        "title": "Run getBillingProfile",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": "getBillingProfile API"
+              },
+              "skill_variable": "apiName"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "client_actions",
+          "client_actions": [
+            {
+              "name": "getBillingProfiles",
+              "parameters": [
+                {
+                  "value": {
+                    "scalar": "client"
+                  },
+                  "parameter": "type"
+                },
+                {
+                  "value": {
+                    "expression": "${msisdn}"
+                  },
+                  "parameter": "msisdn"
+                },
+                {
+                  "value": {
+                    "scalar": "TOBIMS"
+                  },
+                  "parameter": "gtpTarget"
+                },
+                {
+                  "value": {
+                    "expression": "\"/care-billing/v2/${dxidmPlatformSessionID}/journey/multiBillingProfiles/accounts/${accountNo}/billingprofiles\""
+                  },
+                  "parameter": "destinationPath"
+                },
+                {
+                  "value": {
+                    "scalar": "billingprofiles"
+                  },
+                  "parameter": "result_variable"
+                },
+                {
+                  "value": {
+                    "expression": "${dxidmEncodedAuthToken}"
+                  },
+                  "parameter": "authorizationToken"
+                }
+              ],
+              "result_variable": "step_417_result_2"
+            }
+          ]
+        },
+        "variable": "step_417",
+        "next_step": "step_471"
+      },
+      {
+        "step": "step_471",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "variable": "step_417_result_2"
+              },
+              "skill_variable": "billingProfiles"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_471",
+        "condition": {
+          "exists": {
+            "variable": "step_417_result_2"
+          }
+        },
+        "next_step": "step_541"
+      },
+      {
+        "step": "step_541",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "apiSuccess"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_541",
+        "condition": {
+          "expression": "${billingProfiles}.status.httpStatus == 200"
+        },
+        "next_step": "step_136"
+      },
+      {
+        "step": "step_136",
+        "type": "standard",
+        "title": "Customer has one account",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "expression": "\"latest\""
+              },
+              "skill_variable": "billType"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "invoke_another_action_and_end",
+          "invoke_action": {
+            "action": "action_22689",
+            "policy": "default",
+            "parameters": null,
+            "result_variable": "step_136_result_1",
+            "ignore_end_action_steps": false
+          }
+        },
+        "variable": "step_136",
+        "condition": {
+          "expression": "${billingProfiles}.output.billProfileList.length == 1"
+        },
+        "next_step": "step_269"
+      },
+      {
+        "step": "step_269",
+        "type": "standard",
+        "title": "Customer has more than one account",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "eCareDeflection"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "end_action"
+        },
+        "variable": "step_269",
+        "condition": {
+          "expression": "${billingProfiles}.output.billProfileList.length > 1"
+        }
+      }
+    ],
+    "title": "getBillingProfile API",
+    "action": "action_40372",
+    "boosts": [],
+    "handlers": [],
+    "condition": {
+      "intent": "action_40372_intent_45812"
+    },
+    "variables": [
+      {
+        "title": "Latest bill profile list length",
+        "variable": "step_136",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_136_result_1",
+        "data_type": "any"
+      },
+      {
+        "title": "Customer has more than one account",
+        "variable": "step_269",
+        "data_type": "any"
+      },
+      {
+        "title": "Run getBillingProfile",
+        "variable": "step_417",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_417_result_2",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_471",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_541",
+        "data_type": "any"
+      }
+    ],
+    "launch_mode": "learning",
+    "next_action": "action_1903",
+    "topic_switch": {
+      "allowed_from": true,
+      "allowed_into": true,
+      "never_return": false
+    },
+    "disambiguation_opt_out": false
+  },
+  {
+    "type": "standard",
+    "steps": [
+      {
+        "step": "step_417",
+        "type": "standard",
+        "title": "Run getBillingProfile",
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": "getBillingProfile API"
+              },
+              "skill_variable": "apiName"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "client_actions",
+          "client_actions": [
+            {
+              "name": "getBillingProfiles",
+              "parameters": [
+                {
+                  "value": {
+                    "scalar": "client"
+                  },
+                  "parameter": "type"
+                },
+                {
+                  "value": {
+                    "expression": "${msisdn}"
+                  },
+                  "parameter": "msisdn"
+                },
+                {
+                  "value": {
+                    "scalar": "TOBIMS"
+                  },
+                  "parameter": "gtpTarget"
+                },
+                {
+                  "value": {
+                    "expression": "\"/care-billing/v2/${dxidmPlatformSessionID}/journey/multiBillingProfiles/accounts/${accountNo}/billingprofiles\""
+                  },
+                  "parameter": "destinationPath"
+                },
+                {
+                  "value": {
+                    "scalar": "billingprofiles"
+                  },
+                  "parameter": "result_variable"
+                },
+                {
+                  "value": {
+                    "expression": "${dxidmEncodedAuthToken}"
+                  },
+                  "parameter": "authorizationToken"
+                }
+              ],
+              "result_variable": "step_417_result_2"
+            }
+          ]
+        },
+        "variable": "step_417",
+        "next_step": "step_471"
+      },
+      {
+        "step": "step_471",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "variable": "step_417_result_2"
+              },
+              "skill_variable": "billingProfiles"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_471",
+        "condition": {
+          "exists": {
+            "variable": "step_417_result_2"
+          }
+        },
+        "next_step": "step_541"
+      },
+      {
+        "step": "step_541",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "apiSuccess"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_541",
+        "condition": {
+          "expression": "${billingProfiles}.status.httpStatus == 200"
+        },
+        "next_step": "step_136"
+      },
+      {
+        "step": "step_136",
+        "type": "standard",
+        "title": "Customer has one account",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "expression": "\"future\""
+              },
+              "skill_variable": "billType"
+            },
+            {
+              "value": {
+                "expression": "${billingProfiles}.output"
+              },
+              "skill_variable": "billData"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "invoke_another_action_and_end",
+          "invoke_action": {
+            "action": "action_22689-2",
+            "policy": "default",
+            "parameters": null,
+            "result_variable": "step_136_result_1",
+            "ignore_end_action_steps": false
+          }
+        },
+        "variable": "step_136",
+        "condition": {
+          "expression": "${billingProfiles}.output.billProfileList.length == 1"
+        },
+        "next_step": "step_269"
+      },
+      {
+        "step": "step_269",
+        "type": "standard",
+        "title": "Customer has more than one account",
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "eCareDeflection"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "end_action"
+        },
+        "variable": "step_269",
+        "condition": {
+          "expression": "${billingProfiles}.output.billProfileList.length > 1"
+        }
+      }
+    ],
+    "title": "Future Bill API 1 - getBillingProfiles",
+    "action": "action_40372-2",
+    "boosts": [],
+    "handlers": [],
+    "condition": {
+      "intent": "action_40372_intent_45812-2"
+    },
+    "variables": [
+      {
+        "title": "Customer has one account",
+        "variable": "step_136",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_136_result_1",
+        "data_type": "any"
+      },
+      {
+        "title": "No response",
+        "variable": "step_269",
+        "data_type": "any"
+      },
+      {
+        "title": "Run getBillingProfile",
+        "variable": "step_417",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_417_result_2",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_471",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_541",
+        "data_type": "any"
+      }
+    ],
+    "launch_mode": "learning",
+    "next_action": "action_22689-2",
+    "topic_switch": {
+      "allowed_from": true,
+      "allowed_into": true,
+      "never_return": false
+    },
+    "disambiguation_opt_out": false
+  },
+  {
+    "type": "standard",
+    "steps": [
+      {
+        "step": "step_946",
+        "type": "standard",
+        "title": "RUN API",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": "getMonthlyBillSummary"
+              },
+              "skill_variable": "apiName"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "client_actions",
+          "client_actions": [
+            {
+              "name": "getMonthBillSummary",
+              "parameters": [
+                {
+                  "value": {
+                    "scalar": "client"
+                  },
+                  "parameter": "type"
+                },
+                {
+                  "value": {
+                    "expression": "${msisdn}"
+                  },
+                  "parameter": "msisdn"
+                },
+                {
+                  "value": {
+                    "scalar": "TOBIMS"
+                  },
+                  "parameter": "gtpTarget"
+                },
+                {
+                  "value": {
+                    "expression": "\"/care-billing/v2/${dxidmPlatformSessionID}/journey/multimonth/accounts/${accountNo}/billingprofiles/billingProfileId/bill-summaries/latest\""
+                  },
+                  "parameter": "destinationPath"
+                },
+                {
+                  "value": {
+                    "scalar": "monthbillsummary"
+                  },
+                  "parameter": "result_variable"
+                },
+                {
+                  "value": {
+                    "expression": "${dxidmEncodedAuthToken}"
+                  },
+                  "parameter": "authorizationToken"
+                }
+              ],
+              "result_variable": "step_946_result_1"
+            }
+          ]
+        },
+        "variable": "step_946",
+        "next_step": "step_730"
+      },
+      {
+        "step": "step_730",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "variable": "step_946_result_1"
+              },
+              "skill_variable": "monthBillSummaryResults"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_730",
+        "condition": {
+          "exists": {
+            "variable": "step_946_result_1"
+          }
+        },
+        "next_step": "step_976"
+      },
+      {
+        "step": "step_976",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": []
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_976",
+        "condition": {
+          "expression": "${monthBillSummaryResults}.status.httpStatus == 200"
+        },
+        "next_step": "step_521"
+      },
+      {
+        "step": "step_521",
+        "type": "standard",
+        "title": "Bill generated is the first bill",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "eCareDeflection"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "end_action"
+        },
+        "variable": "step_521",
+        "condition": {
+          "expression": "${monthBillSummaryResults}.output.billType == \"First bill\""
+        },
+        "next_step": "step_463"
+      },
+      {
+        "step": "step_463",
+        "type": "standard",
+        "title": "Set Latest Bill Context",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.billMonth.fullMonth"
+              },
+              "skill_variable": "fullMonth"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.billStatus"
+              },
+              "skill_variable": "billStatus"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.totalOutOfPlanCharges.value"
+              },
+              "skill_variable": "outOfPlanCharges"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_463",
+        "condition": {
+          "or": [
+            {
+              "and": [
+                {
+                  "expression": "${monthBillSummaryResults}.output.totalOutOfPlanCharges.value"
+                },
+                {
+                  "expression": "${monthBillSummaryResults}.output.billStatus"
+                }
+              ]
+            },
+            {
+              "and": [
+                {
+                  "expression": "${monthBillSummaryResults}.output.billType == \"Latest bill\""
+                }
+              ]
+            }
+          ]
+        },
+        "next_step": "step_586"
+      },
+      {
+        "step": "step_586",
+        "type": "standard",
+        "title": "Paid, Pending or Unpaid Bill Status",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "apiSuccess"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "invoke_another_action_and_end",
+          "invoke_action": {
+            "action": "action_3006",
+            "policy": "default",
+            "parameters": null,
+            "result_variable": "step_586_result_2",
+            "ignore_end_action_steps": false
+          }
+        },
+        "variable": "step_586",
+        "condition": {
+          "or": [
+            {
+              "expression": "${billStatus} == \"paid\""
+            },
+            {
+              "expression": "${billStatus} == \"unpaid\""
+            },
+            {
+              "expression": "${billStatus} == \"pending\""
+            }
+          ]
+        },
+        "next_step": "step_609"
+      },
+      {
+        "step": "step_609",
+        "type": "standard",
+        "title": "RUN OLD API BACK UP",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": []
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_609",
+        "condition": {
+          "expression": "${billStatus} == \"unknown\""
+        }
+      }
+    ],
+    "title": "getMonthBillSummary API",
+    "action": "action_22689",
+    "boosts": [],
+    "handlers": [],
+    "condition": {
+      "intent": "action_22689_intent_4702"
+    },
+    "variables": [
+      {
+        "title": "Set Latest Bill Context",
+        "variable": "step_463",
+        "data_type": "any"
+      },
+      {
+        "title": "Bill generated is the first bill",
+        "variable": "step_521",
+        "data_type": "any"
+      },
+      {
+        "title": "Paid, Pending or Unpaid Bill Status",
+        "variable": "step_586",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_586_result_2",
+        "data_type": "any"
+      },
+      {
+        "title": "RUN OLD API BACK UP",
+        "variable": "step_609",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_730",
+        "data_type": "any"
+      },
+      {
+        "title": "RUN API",
+        "variable": "step_946",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_946_result_1",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_976",
+        "data_type": "any"
+      }
+    ],
+    "launch_mode": "learning",
+    "next_action": "action_40372",
+    "topic_switch": {
+      "allowed_from": true,
+      "allowed_into": true,
+      "never_return": false
+    },
+    "disambiguation_opt_out": false
+  },
+  {
+    "type": "standard",
+    "steps": [
+      {
+        "step": "step_754",
+        "type": "standard",
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": "previousBillSubcriptions API"
+              },
+              "skill_variable": "apiName"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "client_actions",
+          "client_actions": [
+            {
+              "name": "getPreviousBills",
+              "parameters": [
+                {
+                  "value": {
+                    "expression": "${msisdn}"
+                  },
+                  "parameter": "msisdn"
+                },
+                {
+                  "value": {
+                    "scalar": "TOBIMS"
+                  },
+                  "parameter": "gtpTarget"
+                },
+                {
+                  "value": {
+                    "expression": "\"/care-billing/v2/${dxidmPlatformSessionID}/journey/month/accounts/${accountNo}/billingprofiles/billingProfileId/bill-summaries/${month}/subscriptions\""
+                  },
+                  "parameter": "destinationPath"
+                },
+                {
+                  "value": {
+                    "scalar": "previousBillSubcriptions"
+                  },
+                  "parameter": "result_variable"
+                },
+                {
+                  "value": {
+                    "skill_variable": "dxidmEncodedAuthToken"
+                  },
+                  "parameter": "authorizationToken"
+                }
+              ],
+              "result_variable": "step_754_result_1"
+            }
+          ]
+        },
+        "variable": "step_754",
+        "next_step": "step_426"
+      },
+      {
+        "step": "step_426",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "variable": "step_754_result_1"
+              },
+              "skill_variable": "previousBillSubcriptions"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_426",
+        "condition": {
+          "exists": {
+            "variable": "step_754_result_1"
+          }
+        },
+        "next_step": "step_840"
+      },
+      {
+        "step": "step_840",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "apiSuccess"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "end_action"
+        },
+        "variable": "step_840",
+        "condition": {
+          "expression": "${previousBillSubcriptions}.status.httpStatus == 200"
+        }
+      }
+    ],
+    "title": "previousBillSubcriptions API",
+    "action": "action_23216",
+    "boosts": [],
+    "handlers": [],
+    "condition": {
+      "intent": "action_23216_intent_46800"
+    },
+    "variables": [
+      {
+        "title": "",
+        "variable": "step_426",
+        "data_type": "any"
+      },
+      {
+        "title": "No response",
+        "variable": "step_754",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_754_result_1",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_840",
+        "data_type": "any"
+      }
+    ],
+    "launch_mode": "learning",
+    "next_action": "action_38175",
+    "topic_switch": {
+      "allowed_from": true,
+      "allowed_into": true,
+      "never_return": false
+    },
+    "disambiguation_opt_out": false
+  },
+  {
+    "type": "standard",
+    "steps": [
+      {
+        "step": "step_946",
+        "type": "standard",
+        "title": "RUN API",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": "getMonthlyBillSummary"
+              },
+              "skill_variable": "apiName"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "client_actions",
+          "client_actions": [
+            {
+              "name": "getMonthBillSummary",
+              "parameters": [
+                {
+                  "value": {
+                    "scalar": "client"
+                  },
+                  "parameter": "type"
+                },
+                {
+                  "value": {
+                    "expression": "${msisdn}"
+                  },
+                  "parameter": "msisdn"
+                },
+                {
+                  "value": {
+                    "scalar": "TOBIMS"
+                  },
+                  "parameter": "gtpTarget"
+                },
+                {
+                  "value": {
+                    "expression": "\"/care-billing/v2/${dxidmPlatformSessionID}/journey/multimonth/accounts/${accountNo}/billingprofiles/billingProfileId/future-estimate-bill-summary\""
+                  },
+                  "parameter": "destinationPath"
+                },
+                {
+                  "value": {
+                    "scalar": "monthbillsummary"
+                  },
+                  "parameter": "result_variable"
+                },
+                {
+                  "value": {
+                    "expression": "${dxidmEncodedAuthToken}"
+                  },
+                  "parameter": "authorizationToken"
+                }
+              ],
+              "result_variable": "step_946_result_1"
+            }
+          ]
+        },
+        "variable": "step_946",
+        "next_step": "step_730"
+      },
+      {
+        "step": "step_730",
+        "type": "standard",
+        "title": "Set monthBillSummaryResult",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "variable": "step_946_result_1"
+              },
+              "skill_variable": "monthBillSummaryResults"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_730",
+        "condition": {
+          "exists": {
+            "variable": "step_946_result_1"
+          }
+        },
+        "next_step": "step_976"
+      },
+      {
+        "step": "step_976",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "apiSuccess"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_976",
+        "condition": {
+          "expression": "${monthBillSummaryResults}.status.httpStatus == 200"
+        },
+        "next_step": "step_521"
+      },
+      {
+        "step": "step_521",
+        "type": "standard",
+        "title": "Bill generated is the first bill",
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "eCareDeflection"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "end_action"
+        },
+        "variable": "step_521",
+        "condition": {
+          "expression": "${monthBillSummaryResults}.output.billType == \"First bill\""
+        },
+        "next_step": "step_463"
+      },
+      {
+        "step": "step_463",
+        "type": "standard",
+        "title": "Set Latest Bill Context",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.billMonth.fullMonth"
+              },
+              "skill_variable": "fullMonth"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.billStatus"
+              },
+              "skill_variable": "billStatus"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.totalOutOfPlanCharges.value"
+              },
+              "skill_variable": "outOfPlanCharges"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.billMonth.monthMMM"
+              },
+              "skill_variable": "monthMMM"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.paymentMethodMessage"
+              },
+              "skill_variable": "billingMessage"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.formattedBillDateRange"
+              },
+              "skill_variable": "formattedBillDateRange"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.totalLabel"
+              },
+              "skill_variable": "totalLabel"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output.inPlan.value"
+              },
+              "skill_variable": "billTotalAmount"
+            },
+            {
+              "value": {
+                "expression": "${monthBillSummaryResults}.output"
+              },
+              "skill_variable": "billData"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_463",
+        "condition": {
+          "or": [
+            {
+              "and": [
+                {
+                  "expression": "${monthBillSummaryResults}.output.totalOutOfPlanCharges.value"
+                },
+                {
+                  "expression": "${monthBillSummaryResults}.output.billStatus"
+                }
+              ]
+            },
+            {
+              "and": [
+                {
+                  "expression": "${monthBillSummaryResults}.output.billType == \"Future bill\""
+                }
+              ]
+            }
+          ]
+        },
+        "next_step": "step_586"
+      },
+      {
+        "step": "step_586",
+        "type": "standard",
+        "title": "Paid, Pending or Unpaid Bill Status",
+        "handlers": [],
+        "resolver": {
+          "type": "invoke_another_action_and_end",
+          "invoke_action": {
+            "action": "action_32072",
+            "policy": "default",
+            "parameters": null,
+            "result_variable": "step_586_result_3",
+            "ignore_end_action_steps": false
+          }
+        },
+        "variable": "step_586",
+        "condition": {
+          "or": [
+            {
+              "expression": "${billStatus} == \"paid\""
+            },
+            {
+              "expression": "${billStatus} == \"unpaid\""
+            },
+            {
+              "expression": "${billStatus} == \"pending\""
+            }
+          ]
+        },
+        "next_step": "step_609"
+      },
+      {
+        "step": "step_609",
+        "type": "standard",
+        "title": "RUN OLD API BACK UP",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": []
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_609",
+        "condition": {
+          "expression": "${billStatus} == \"unknown\""
+        }
+      }
+    ],
+    "title": "Future Bill API 2- getMonthlyBillSummary",
+    "action": "action_22689-2",
+    "boosts": [],
+    "handlers": [],
+    "condition": {
+      "intent": "action_22689_intent_4702-2"
+    },
+    "variables": [
+      {
+        "title": "Set Latest Bill Context",
+        "variable": "step_463",
+        "data_type": "any"
+      },
+      {
+        "title": "Bill generated is the first bill",
+        "variable": "step_521",
+        "data_type": "any"
+      },
+      {
+        "title": "Paid, Pending or Unpaid Bill Status",
+        "variable": "step_586",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_586_result_3",
+        "data_type": "any"
+      },
+      {
+        "title": "RUN OLD API BACK UP",
+        "variable": "step_609",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_730",
+        "data_type": "any"
+      },
+      {
+        "title": "RUN API",
+        "variable": "step_946",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_946_result_1",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_976",
+        "data_type": "any"
+      }
+    ],
+    "launch_mode": "learning",
+    "next_action": "action_3006-2",
+    "topic_switch": {
+      "allowed_from": true,
+      "allowed_into": true,
+      "never_return": false
+    },
+    "disambiguation_opt_out": false
+  },
+  {
+    "type": "standard",
+    "steps": [
+      {
+        "step": "step_887",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": "PreviousBillSummary API call"
+              },
+              "skill_variable": "apiName"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "client_actions",
+          "client_actions": [
+            {
+              "name": "getPreviousBills",
+              "parameters": [
+                {
+                  "value": {
+                    "scalar": "client"
+                  },
+                  "parameter": "type"
+                },
+                {
+                  "value": {
+                    "scalar": "TOBIMS"
+                  },
+                  "parameter": "gtpTarget"
+                },
+                {
+                  "value": {
+                    "expression": "\"/care-billing/v2/${dxidmPlatformSessionID}/journey/month/accounts/${accountNo}/billingprofiles/billingProfileId/month-bill-summary/${month}\""
+                  },
+                  "parameter": "destinationPath"
+                },
+                {
+                  "value": {
+                    "scalar": "previousBillSummary"
+                  },
+                  "parameter": "result_variable"
+                },
+                {
+                  "value": {
+                    "expression": "${dxidmEncodedAuthToken}"
+                  },
+                  "parameter": "authorizationToken"
+                }
+              ],
+              "result_variable": "step_887_result_2"
+            }
+          ]
+        },
+        "variable": "step_887",
+        "next_step": "step_661"
+      },
+      {
+        "step": "step_661",
+        "type": "standard",
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "variable": "step_887_result_2"
+              },
+              "skill_variable": "previousBillSummary"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_661",
+        "condition": {
+          "exists": {
+            "variable": "step_887_result_2"
+          }
+        },
+        "next_step": "step_625"
+      },
+      {
+        "step": "step_625",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "apiSuccess"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "invoke_another_action_and_end",
+          "invoke_action": {
+            "action": "action_23216",
+            "policy": "default",
+            "parameters": null,
+            "result_variable": "step_625_result_1",
+            "ignore_end_action_steps": false
+          }
+        },
+        "variable": "step_625",
+        "condition": {
+          "expression": "${previousBillSummary}.status.httpStatus == 200"
+        },
+        "next_step": "step_409"
+      },
+      {
+        "step": "step_409",
+        "type": "standard",
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_409"
+      }
+    ],
+    "title": "PreviousBillSummary API call",
+    "action": "action_32595",
+    "boosts": [],
+    "handlers": [],
+    "condition": {
+      "intent": "action_32595_intent_3798"
+    },
+    "variables": [
+      {
+        "title": "No response",
+        "variable": "step_409",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_625",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_625_result_1",
+        "data_type": "any"
+      },
+      {
+        "title": "No response",
+        "variable": "step_661",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_887",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_887_result_2",
+        "data_type": "any"
+      }
+    ],
+    "launch_mode": "learning",
+    "next_action": "action_22147",
+    "topic_switch": {
+      "allowed_from": true,
+      "allowed_into": true,
+      "never_return": false
+    },
+    "disambiguation_opt_out": false
+  },
+  {
+    "type": "standard",
+    "steps": [
+      {
+        "step": "step_718",
+        "type": "standard",
+        "title": "Run API call",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "scalar": "getSubscriptionDetails API call"
+              },
+              "skill_variable": "apiName"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "client_actions",
+          "client_actions": [
+            {
+              "name": "getSubscriptionDetails",
+              "parameters": [
+                {
+                  "value": {
+                    "expression": "${dxidmEncodedAuthToken}"
+                  },
+                  "parameter": "authorizationToken"
+                },
+                {
+                  "value": {
+                    "scalar": "subscriptionDetails"
+                  },
+                  "parameter": "result_variable"
+                },
+                {
+                  "value": {
+                    "expression": "${engagementId}"
+                  },
+                  "parameter": "conversationID"
+                },
+                {
+                  "value": {
+                    "scalar": "TOBIMS"
+                  },
+                  "parameter": "gtpTarget"
+                },
+                {
+                  "value": {
+                    "expression": "${msisdn}"
+                  },
+                  "parameter": "msisdn"
+                },
+                {
+                  "value": {
+                    "expression": "\"/care-billing/v2/${dxidmPlatformSessionID}/journey/month/accounts/${accountNo}/billingprofiles/billingProfileId/bill-summaries/future/subscriptions\""
+                  },
+                  "parameter": "destinationPath"
+                }
+              ],
+              "result_variable": "step_718_result_1"
+            }
+          ]
+        },
+        "variable": "step_718",
+        "next_step": "step_133"
+      },
+      {
+        "step": "step_133",
+        "type": "standard",
+        "title": "Set subscriptionDetailsOutput",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "variable": "step_718_result_1"
+              },
+              "skill_variable": "subscriptionDetailsOutput"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_133",
+        "condition": {
+          "exists": {
+            "variable": "step_718_result_1"
+          }
+        },
+        "next_step": "step_926"
+      },
+      {
+        "step": "step_926",
+        "type": "standard",
+        "output": {
+          "generic": []
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "continue"
+        },
+        "variable": "step_926",
+        "next_step": "step_433"
+      },
+      {
+        "step": "step_433",
+        "type": "standard",
+        "title": "Set subscriptionData",
+        "output": {
+          "generic": []
+        },
+        "context": {
+          "variables": [
+            {
+              "value": {
+                "expression": "${subscriptionDetailsOutput}.output"
+              },
+              "skill_variable": "subscriptionData"
+            },
+            {
+              "value": {
+                "scalar": true
+              },
+              "skill_variable": "apiSuccess"
+            }
+          ]
+        },
+        "handlers": [],
+        "resolver": {
+          "type": "end_action"
+        },
+        "variable": "step_433",
+        "condition": {
+          "exists": {
+            "skill_variable": "subscriptionDetailsOutput"
+          }
+        }
+      }
+    ],
+    "title": "Future Bill API 3.1 - getSubscriptionDetails",
+    "action": "action_32072",
+    "boosts": [],
+    "handlers": [],
+    "condition": {
+      "intent": "action_32072_intent_24176"
+    },
+    "variables": [
+      {
+        "title": "",
+        "variable": "step_133",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_433",
+        "data_type": "any"
+      },
+      {
+        "title": "Run API call",
+        "variable": "step_718",
+        "data_type": "any"
+      },
+      {
+        "variable": "step_718_result_1",
+        "data_type": "any"
+      },
+      {
+        "title": "",
+        "variable": "step_926",
+        "data_type": "any"
+      }
+    ],
+    "launch_mode": "learning",
+    "next_action": "action_40372-2",
+    "topic_switch": {
+      "allowed_from": true,
+      "allowed_into": true,
+      "never_return": false
+    },
+    "disambiguation_opt_out": false
+  }
+]

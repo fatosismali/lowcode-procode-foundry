@@ -1,0 +1,151 @@
+"""Test suite for {{ agent_class }} agent."""
+
+import pytest
+import asyncio
+from unittest.mock import Mock, AsyncMock, patch
+from pathlib import Path
+
+from src.orchestrator import {{ agent_class }}
+from src.config import AgentConfig
+from src.models import *
+
+
+class TestAgentInitialization:
+    """Test agent initialization and configuration."""
+    
+    def test_agent_init_with_config(self):
+        """Test agent initialization with explicit config."""
+        config = AgentConfig.from_env()
+        agent = {{ agent_class }}(config=config)
+        
+        assert agent is not None
+        assert agent.config == config
+    
+    def test_agent_init_default_config(self):
+        """Test agent initialization with default config from env."""
+        agent = {{ agent_class }}()
+        
+        assert agent is not None
+        assert agent.config is not None
+        assert agent.config.model_name == "{{ model }}"
+
+
+class TestConfiguration:
+    """Test configuration management."""
+    
+    def test_config_from_env(self):
+        """Test loading config from environment."""
+        config = AgentConfig.from_env()
+        
+        assert config is not None
+        assert config.foundry_project_connection_string is not None
+    
+    def test_config_validation(self):
+        """Test config field validation."""
+        config = AgentConfig.from_env()
+        
+        # Test log level validation
+        assert config.log_level in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+        
+        # Test reasoning effort validation
+        assert config.reasoning_effort in ("low", "medium", "high")
+
+
+class TestAgentModels:
+    """Test Pydantic models for tools."""
+    
+    {% for tool in function_tools %}
+    def test_{{ tool.safe_name }}_request_model(self):
+        """Test {{ tool.name }} request model."""
+        request = {{ tool.class_name }}Request(
+            {% if tool.parameters and tool.parameters.properties %}
+            {% for param_name in tool.parameters.properties %}
+            {{ param_name }}="test_value",
+            {% endfor %}
+            {% endif %}
+        )
+        
+        assert request is not None
+    
+    def test_{{ tool.safe_name }}_response_model(self):
+        """Test {{ tool.name }} response model."""
+        response = {{ tool.class_name }}Response(
+            status="success",
+            data={"result": "test"},
+        )
+        
+        assert response.status == "success"
+        assert response.data == {"result": "test"}
+    
+    {% endfor %}
+
+
+class TestToolExecution:
+    """Test tool execution methods."""
+    
+    @pytest.mark.asyncio
+    {% for tool in function_tools %}
+    async def test_{{ tool.safe_name }}_execution(self):
+        """Test {{ tool.name }} tool execution."""
+        config = AgentConfig.from_env()
+        agent = {{ agent_class }}(config=config)
+        
+        # TODO: Mock external dependencies
+        result = await agent._execute_{{ tool.safe_name }}(
+            {% if tool.parameters and tool.parameters.properties %}
+            {% for param_name in tool.parameters.properties %}
+            {{ param_name }}="test",
+            {% endfor %}
+            {% endif %}
+        )
+        
+        assert isinstance(result, dict)
+        assert "status" in result
+    
+    {% endfor %}
+
+
+class TestConversation:
+    """Test conversation methods."""
+    
+    @pytest.mark.asyncio
+    async def test_run_conversation(self):
+        """Test single conversation turn."""
+        config = AgentConfig.from_env()
+        agent = {{ agent_class }}(config=config)
+        
+        # TODO: Mock agent responses
+        # response = await agent.run_conversation("Hello")
+        # assert isinstance(response, str)
+
+
+class TestIntegration:
+    """End-to-end integration tests."""
+    
+    @pytest.mark.asyncio
+    async def test_agent_lifecycle(self):
+        """Test full agent lifecycle."""
+        # Initialize
+        agent = {{ agent_class }}()
+        assert agent is not None
+        
+        # TODO: Add end-to-end tests
+        # response = await agent.run_conversation("test message")
+        # assert response is not None
+
+
+# Fixtures
+@pytest.fixture
+def agent_config():
+    """Fixture providing agent configuration."""
+    return AgentConfig.from_env()
+
+
+@pytest.fixture
+def agent(agent_config):
+    """Fixture providing initialized agent."""
+    return {{ agent_class }}(config=agent_config)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -1,0 +1,5 @@
+# MCP server SDK (FastMCP) with CLI + streamable HTTP transport
+mcp[cli]>=1.2.0
+
+# ASGI server used by the streamable-http transport
+uvicorn>=0.30.0

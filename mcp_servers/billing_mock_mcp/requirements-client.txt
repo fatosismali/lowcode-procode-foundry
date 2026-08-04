@@ -1,0 +1,7 @@
+# Dependencies for the natural-language agent client (agent_client.py)
+
+# Microsoft Agent Framework (agent + MCP tool support)
+agent-framework>=1.11.0
+
+# Azure auth for Azure OpenAI token access (no keys)
+azure-identity>=1.14.0

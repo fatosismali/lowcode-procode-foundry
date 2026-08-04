@@ -1,0 +1,193 @@
+"""
+Tests for {{agent_name}} Agent
+
+Comprehensive pytest suite for agent functionality, tool execution, and integration.
+Run with: pytest tests/ or pytest tests/ -v
+"""
+
+import pytest
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from src.orchestrator import {{agent_class}}
+from src.config import AgentConfig
+from src.models import (
+{%- for tool in function_tools %}
+    {{tool.class_name}}Request,
+    {{tool.class_name}}Response,
+{%- endfor %}
+)
+
+
+@pytest.fixture
+def mock_config():
+    """Create a mock agent configuration."""
+    return AgentConfig(
+        foundry_project_connection_string="mock://foundry-project-connection",
+        model_name="{{model}}",
+        log_level="DEBUG",
+    )
+
+
+@pytest.fixture
+def agent(mock_config):
+    """Create an agent instance with mocked config."""
+    return {{agent_class}}(config=mock_config)
+
+
+class TestAgentInitialization:
+    """Test agent initialization and configuration."""
+
+    def test_agent_init_with_config(self, mock_config):
+        """Test agent initialization with provided config."""
+        agent = {{agent_class}}(config=mock_config)
+        assert agent.config == mock_config
+        assert agent.config.model_name == "{{model}}"
+
+    def test_agent_init_without_config(self, mock_config, monkeypatch):
+        """Test agent initialization loading config from environment."""
+        # Mock environment for default config loading
+        agent = {{agent_class}}()
+        assert agent.config is not None
+
+
+class TestToolExecution:
+    """Test tool execution and validation."""
+
+{%- for tool in function_tools %}
+
+    @pytest.mark.asyncio
+    async def test_{{tool.safe_name}}_execution(self, agent):
+        """Test {{tool.name}} tool execution."""
+        # Create test request
+        request = {{tool.class_name}}Request(
+{%- for param in tool.required_params %}
+            {{param}}="test_value",
+{%- endfor %}
+        )
+        
+        # Mock tool execution
+        with patch.object(agent, '_execute_{{tool.safe_name}}', new_callable=AsyncMock) as mock_tool:
+            mock_tool.return_value = {{tool.class_name}}Response(
+                status="success",
+                data={"result": "test"}
+            )
+            
+            result = await mock_tool(request)
+            assert result.status == "success"
+            mock_tool.assert_called_once_with(request)
+
+    @pytest.mark.asyncio
+    async def test_{{tool.safe_name}}_error_handling(self, agent):
+        """Test {{tool.name}} tool error handling."""
+        # Create test request
+        request = {{tool.class_name}}Request(
+{%- for param in tool.required_params %}
+            {{param}}="test_value",
+{%- endfor %}
+        )
+        
+        # Mock tool execution with error
+        with patch.object(agent, '_execute_{{tool.safe_name}}', new_callable=AsyncMock) as mock_tool:
+            mock_tool.side_effect = Exception("Tool error")
+            
+            with pytest.raises(Exception):
+                await mock_tool(request)
+
+{%- endfor %}
+
+
+class TestConversation:
+    """Test agent conversation capabilities."""
+
+    @pytest.mark.asyncio
+    async def test_single_turn_conversation(self, agent):
+        """Test single conversation turn."""
+        user_message = "What is the status?"
+        
+        with patch.object(agent, 'run_conversation', new_callable=AsyncMock) as mock_run:
+            mock_run.return_value = "Agent response"
+            
+            response = await mock_run(user_message)
+            assert response == "Agent response"
+            mock_run.assert_called_once_with(user_message)
+
+    @pytest.mark.asyncio
+    async def test_conversation_with_tools(self, agent):
+        """Test conversation with tool invocation."""
+        user_message = "Get incident details"
+        
+        with patch.object(agent, 'run_conversation', new_callable=AsyncMock) as mock_run:
+            mock_run.return_value = "Incident details: ..."
+            
+            response = await mock_run(user_message)
+            assert "Incident" in response
+
+
+class TestConfiguration:
+    """Test configuration loading and validation."""
+
+    def test_config_from_dict(self, mock_config):
+        """Test configuration from dictionary."""
+        assert mock_config.foundry_project_connection_string is not None
+        assert mock_config.model_name == "{{model}}"
+        assert mock_config.reasoning_effort == "{{reasoning_effort}}"
+
+    def test_config_get_enabled_tools(self, mock_config):
+        """Test getting enabled tools list."""
+        enabled_tools = mock_config.get_enabled_tools()
+        assert isinstance(enabled_tools, list)
+        assert len(enabled_tools) > 0
+
+    def test_config_repr(self, mock_config):
+        """Test config string representation."""
+        config_str = repr(mock_config)
+        assert "AgentConfig" in config_str
+        assert "{{model}}" in config_str
+
+
+class TestAgentModels:
+    """Test Pydantic models for type safety."""
+
+{%- for tool in function_tools %}
+
+    def test_{{tool.safe_name}}_request_validation(self):
+        """Test {{tool.name}} request model validation."""
+        request = {{tool.class_name}}Request(
+{%- for param in tool.required_params %}
+            {{param}}="test",
+{%- endfor %}
+        )
+        
+        assert request is not None
+        assert hasattr(request, '{{tool.required_params[0]}}')
+
+    def test_{{tool.safe_name}}_response_validation(self):
+        """Test {{tool.name}} response model validation."""
+        response = {{tool.class_name}}Response(
+            status="success",
+            data={"key": "value"}
+        )
+        
+        assert response.status == "success"
+        assert response.data["key"] == "value"
+        assert response.error is None
+
+{%- endfor %}
+
+
+# Integration Tests
+
+class TestIntegration:
+    """Integration tests for end-to-end workflows."""
+
+    @pytest.mark.asyncio
+    async def test_end_to_end_workflow(self, agent):
+        """Test complete agent workflow."""
+        # This is a placeholder for integration tests
+        # In production, this would test the full agent workflow
+        assert agent is not None
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

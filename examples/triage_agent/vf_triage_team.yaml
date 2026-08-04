@@ -1,0 +1,50 @@
+# Multi-agent orchestration ("team") definition.
+#
+# Each entry in `agents` points to a single declarative agent YAML.
+# `pattern` selects the Microsoft Agent Framework orchestration to generate:
+#   sequential | concurrent | group_chat | handoff
+#
+# See: https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns
+
+name: vf-triage-team
+description: "Vodafone incident response team: triage the fault, then notify customers."
+
+orchestration:
+  # SEQUENTIAL pipeline. Agents run in the order listed below and each agent
+  # receives the full prior conversation — so the first agent's output is the
+  # input/context for the next. No manual argument wiring is needed: the
+  # Agent Framework SequentialBuilder passes the conversation between agents.
+  #
+  # Data contract (what flows from agent 1 -> agent 2):
+  #   1) vf-triage-tool-agent  diagnoses the incident, applies the fix, and
+  #      emits a JSON result:
+  #        {"incident_id","root_cause","action","site_id",
+  #         "affected_customers","applied"}
+  #   2) vf-comms-agent        reads that JSON from the conversation and uses
+  #      site_id / root_cause / affected_customers to draft and send the
+  #      customer notification.
+  pattern: sequential
+
+  # The initial task handed to the FIRST agent (triage).
+  task: "Triage incident INC-4291, apply the corrective action, then notify affected customers."
+
+  # Execution order matters: triage first, communications second.
+  agents:
+    - ./vf_triage_agent.yaml     # 1) diagnose + remediate -> emits triage JSON
+    - ./vf_comms_agent.yaml      # 2) consume triage JSON -> notify customers
+
+  # --- Pattern-specific options (only the relevant ones are used) ---
+
+  # group_chat: optional orchestrator/manager agent for speaker selection
+  # manager:
+  #   name: coordinator
+  #   model: gpt-5
+  #   instructions: "Coordinate triage and communications to resolve the incident."
+
+  # group_chat: maximum conversation turns
+  max_rounds: 6
+
+  # handoff: which agent receives the initial input, and the routing graph
+  # start_agent: vf-triage-tool-agent
+  # handoffs:
+  #   vf-triage-tool-agent: [vf-comms-agent]

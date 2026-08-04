@@ -1,0 +1,74 @@
+# {{ team_name }}
+
+{{ team_description }}
+
+**Orchestration pattern:** `{{ pattern }}` (Microsoft Agent Framework)
+
+## Agents
+
+| Agent | Model | Tools |
+| --- | --- | --- |
+{% for a in agents %}| `{{ a.agent_name }}` | {{ a.model }} | {{ a.total_tools }} |
+{% endfor %}
+
+## Project structure
+
+```
+{{ team_slug }}/
+  team.yaml                Team spec (pattern + which agents) — loaded at runtime
+  agents/
+{% for a in agents %}    {{ a.slug }}.yaml{{ ' ' * (22 - a.slug|length) }}Declarative definition of "{{ a.agent_name }}"
+{% endfor %}  src/
+    orchestrator.py        Single runtime loader: reads the YAMLs, builds every
+                           agent in-process, wires the pattern
+    tools.py               Tool implementations (one place) + TOOL_REGISTRY
+    config.py              Team configuration
+  tests/
+    test_team.py           Smoke test
+  pyproject.toml
+  requirements.txt
+  .env.example
+  Dockerfile
+```
+
+> The orchestrator is **pattern-agnostic**: it reads `team.yaml` and each
+> `agents/*.yaml` at run time and builds the agents dynamically. There are no
+> per-agent Python files — change behaviour by editing the YAMLs (or the pattern
+> in `team.yaml`) and implementing tools in `src/tools.py`.
+
+
+## Pattern: {{ pattern }}
+
+{% if pattern == 'sequential' %}
+Agents run in a fixed pipeline. Each agent processes the previous agent's output.
+Best for step-by-step refinement with clear stage dependencies.
+{% elif pattern == 'concurrent' %}
+All agents work on the same input in parallel and their results are aggregated.
+Best for independent analysis from multiple perspectives and latency-sensitive work.
+{% elif pattern == 'group_chat' %}
+Agents collaborate in a shared conversation coordinated by a chat manager.
+Best for consensus-building, brainstorming, and maker-checker validation loops.
+The conversation ends after {{ max_rounds }} messages.
+{% elif pattern == 'handoff' %}
+Control transfers dynamically between agents. `{{ start_agent }}` receives the
+initial input and hands off to the right specialist based on context.
+Best for tasks where the right specialist emerges during processing.
+{% endif %}
+
+See [AI agent orchestration patterns](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)
+for guidance on choosing a pattern.
+
+## Getting started
+
+```bash
+cp .env.example .env          # add your Foundry project endpoint
+pip install -r requirements.txt
+az login                      # AzureCliCredential is used for auth
+python -m src.orchestrator
+```
+
+## Next steps
+
+1. Implement the tool bodies in `src/tools.py` (one file for all agents).
+2. Adjust agents by editing `agents/*.yaml`, or change the pattern in `team.yaml`.
+3. Extend `tests/test_team.py`.

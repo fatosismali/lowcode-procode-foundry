@@ -1,0 +1,151 @@
+{
+  "_comment": "Mock billing responses keyed by tool name and scenario. Edit these to change what the MCP server returns. Field shapes mirror the paths the source workflow reads: status.httpStatus, output.billProfileList[], output.billMonth.{fullMonth,monthMMM}, output.billStatus, output.billType, output.formattedBillDateRange, output.inPlan.value, output.paymentMethodMessage, output.totalLabel, output.totalOutOfPlanCharges.value",
+
+  "get_billing_profiles": {
+    "single_account": {
+      "status": { "httpStatus": 200 },
+      "output": {
+        "billProfileList": [
+          {
+            "accountNo": "0123456789",
+            "billingProfileId": "BP-0123456789-01",
+            "accountName": "J. Smith",
+            "accountType": "consumer",
+            "currency": "GBP",
+            "billingAddress": "1 High Street, Manchester, M1 1AA"
+          }
+        ]
+      }
+    },
+    "multi_account": {
+      "status": { "httpStatus": 200 },
+      "output": {
+        "billProfileList": [
+          {
+            "accountNo": "0123456789",
+            "billingProfileId": "BP-0123456789-01",
+            "accountName": "J. Smith",
+            "accountType": "consumer",
+            "currency": "GBP",
+            "billingAddress": "1 High Street, Manchester, M1 1AA"
+          },
+          {
+            "accountNo": "0987654321",
+            "billingProfileId": "BP-0987654321-01",
+            "accountName": "J. Smith (Business)",
+            "accountType": "business",
+            "currency": "GBP",
+            "billingAddress": "22 Trade Park, Manchester, M2 2BB"
+          }
+        ]
+      }
+    },
+    "no_response": {
+      "status": { "httpStatus": 502 },
+      "output": {}
+    }
+  },
+
+  "get_month_bill_summary": {
+    "paid": {
+      "status": { "httpStatus": 200 },
+      "output": {
+        "billType": "latest",
+        "billStatus": "Paid",
+        "billMonth": { "fullMonth": "June", "monthMMM": "Jun" },
+        "formattedBillDateRange": "1 Jun 2026 - 30 Jun 2026",
+        "totalLabel": "Total bill",
+        "inPlan": { "value": "£38.00", "amount": 38.0, "currency": "GBP" },
+        "totalOutOfPlanCharges": { "value": "£4.50", "amount": 4.5, "currency": "GBP" },
+        "totalAmount": { "value": "£42.50", "amount": 42.5, "currency": "GBP" },
+        "paymentMethodMessage": "Paid by Direct Debit on 3 Jul 2026.",
+        "isFirstBill": false
+      }
+    },
+    "pending": {
+      "status": { "httpStatus": 200 },
+      "output": {
+        "billType": "latest",
+        "billStatus": "Pending",
+        "billMonth": { "fullMonth": "July", "monthMMM": "Jul" },
+        "formattedBillDateRange": "1 Jul 2026 - 31 Jul 2026",
+        "totalLabel": "Total bill",
+        "inPlan": { "value": "£38.00", "amount": 38.0, "currency": "GBP" },
+        "totalOutOfPlanCharges": { "value": "£7.20", "amount": 7.2, "currency": "GBP" },
+        "totalAmount": { "value": "£45.20", "amount": 45.2, "currency": "GBP" },
+        "paymentMethodMessage": "Your Direct Debit will be taken on 3 Aug 2026.",
+        "isFirstBill": false
+      }
+    },
+    "unpaid": {
+      "status": { "httpStatus": 200 },
+      "output": {
+        "billType": "latest",
+        "billStatus": "Unpaid",
+        "billMonth": { "fullMonth": "July", "monthMMM": "Jul" },
+        "formattedBillDateRange": "1 Jul 2026 - 31 Jul 2026",
+        "totalLabel": "Amount due",
+        "inPlan": { "value": "£38.00", "amount": 38.0, "currency": "GBP" },
+        "totalOutOfPlanCharges": { "value": "£12.00", "amount": 12.0, "currency": "GBP" },
+        "totalAmount": { "value": "£50.00", "amount": 50.0, "currency": "GBP" },
+        "paymentMethodMessage": "Payment is overdue. Please pay £50.00 to avoid service restrictions.",
+        "isFirstBill": false
+      }
+    },
+    "first_bill": {
+      "status": { "httpStatus": 200 },
+      "output": {
+        "billType": "future",
+        "billStatus": "Pending",
+        "billMonth": { "fullMonth": "July", "monthMMM": "Jul" },
+        "formattedBillDateRange": "12 Jun 2026 - 31 Jul 2026",
+        "totalLabel": "First bill total",
+        "inPlan": { "value": "£38.00", "amount": 38.0, "currency": "GBP" },
+        "totalOutOfPlanCharges": { "value": "£9.99", "amount": 9.99, "currency": "GBP" },
+        "totalAmount": { "value": "£61.30", "amount": 61.3, "currency": "GBP" },
+        "paymentMethodMessage": "Your first bill covers a slightly longer period, so it may be higher than usual.",
+        "isFirstBill": true
+      }
+    }
+  },
+
+  "get_previous_bills": {
+    "default": {
+      "status": { "httpStatus": 200 },
+      "output": {
+        "previousBillSummary": [
+          { "month": "2026-05", "monthMMM": "May", "billStatus": "Paid", "totalAmount": { "value": "£41.10", "amount": 41.1, "currency": "GBP" } },
+          { "month": "2026-04", "monthMMM": "Apr", "billStatus": "Paid", "totalAmount": { "value": "£39.75", "amount": 39.75, "currency": "GBP" } },
+          { "month": "2026-03", "monthMMM": "Mar", "billStatus": "Paid", "totalAmount": { "value": "£38.00", "amount": 38.0, "currency": "GBP" } }
+        ],
+        "subscriptions": [
+          { "subscriptionId": "SUB-1", "msisdn": "447700900123", "planName": "Unlimited Max", "monthlyCharge": { "value": "£38.00", "amount": 38.0, "currency": "GBP" } }
+        ]
+      }
+    }
+  },
+
+  "get_subscription_details": {
+    "default": {
+      "status": { "httpStatus": 200 },
+      "output": {
+        "subscriptionDetails": [
+          {
+            "subscriptionId": "SUB-1",
+            "msisdn": "447700900123",
+            "planName": "Unlimited Max",
+            "planType": "airtime",
+            "monthlyCharge": { "value": "£38.00", "amount": 38.0, "currency": "GBP" },
+            "allowances": { "data": "Unlimited", "minutes": "Unlimited", "texts": "Unlimited" },
+            "addOns": [
+              { "name": "Roaming Passport Plus", "charge": { "value": "£6.00", "amount": 6.0, "currency": "GBP" } }
+            ],
+            "outOfPlanCharges": [
+              { "description": "International calls", "charge": { "value": "£4.50", "amount": 4.5, "currency": "GBP" } }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
