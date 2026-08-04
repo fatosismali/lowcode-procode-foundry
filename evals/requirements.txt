@@ -1,0 +1,9 @@
+# Evaluation suite only. The team under test brings its own dependencies
+# (see generated_agents/<team>/requirements.txt) and must be installed too.
+# azure-ai-evaluation runs the judges locally; azure-ai-projects publishes the
+# results to Foundry afterwards.
+azure-ai-evaluation>=1.18.0
+azure-ai-projects>=2.2.0
+azure-identity>=1.14.0
+PyYAML>=6.0
+pytest>=7.4.0
