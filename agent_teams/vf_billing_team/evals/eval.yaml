@@ -1,0 +1,41 @@
+name: vf-billing-team
+team_yaml: ../team.yaml
+publish_name: vf-billing
+
+sets:
+  intent_classifier: ./datasets/intent_classifier.jsonl
+  billing_agent: ./datasets/billing_agent.jsonl
+  system_e2e: ./datasets/system_e2e.jsonl
+
+thresholds: ./thresholds.yaml
+reports_dir: ./reports
+
+task:
+  query_field: userQuery
+  input_fields:
+    account_reference: selectedAccountReference
+
+output:
+  status_field: workflowStatus
+  intents_field: detectedIntent
+
+workflow_schema:
+  ACCOUNT_RESOLVED: [billingContext]
+  ACCOUNT_SELECTION_REQUIRED: [customerMessage, accountOptions]
+  PROFILE_RETRIEVAL_FAILED: [customerMessage]
+  BILLING_EVIDENCE_READY: [detectedIntent, billingEvidence]
+  BILLING_RETRIEVAL_FAILED: [customerMessage]
+
+scope:
+  leak_patterns:
+    - '\b\d{7,}\b'
+    - '\bBP-[A-Za-z0-9-]+'
+    - '\bSUB-[A-Za-z0-9-]+'
+  refusal_patterns:
+    - '\bonly\b.{0,40}\bbilling\b'
+    - '\bbilling\b.{0,40}\bonly\b'
+    - "\\b(can(?:'|no)?t|cannot|unable to|don't)\\b.{0,40}\\b(help|assist|answer)\\b"
+    - '\binformation only\b'
+  clarification_patterns:
+    - '\bwhich\b.{0,40}\baccount\b'
+    - '\b(could|can) you (confirm|tell me|choose|select)\b'

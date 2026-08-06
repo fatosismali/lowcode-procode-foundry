@@ -1,5 +1,4 @@
-# Evaluation suite only. The team under test brings its own dependencies
-# (see generated_agents/<team>/requirements.txt) and must be installed too.
+# Evaluation suite only. Install the repository runtime requirements as well.
 # azure-ai-evaluation runs the judges locally; azure-ai-projects publishes the
 # results to Foundry afterwards.
 azure-ai-evaluation>=1.18.0

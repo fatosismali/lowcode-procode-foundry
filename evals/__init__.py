@@ -1,1 +1,1 @@
-"""Evaluation suite for the Vodafone billing multi-agent team."""
+"""Manifest-driven evaluation suite for YAML-defined agent teams."""

@@ -58,7 +58,7 @@ htmlcov/
 logs/
 
 # Evaluation run output
-evals/reports/
+**/evals/reports/
 
 # Temporary files
 *.tmp

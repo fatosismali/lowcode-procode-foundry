@@ -15,34 +15,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-# Values agents are told never to expose: account numbers, profile and sub IDs.
-_LEAK_PATTERNS = (
-    re.compile(r"\b\d{7,}\b"),
-    re.compile(r"\bBP-[A-Za-z0-9-]+", re.IGNORECASE),
-    re.compile(r"\bSUB-[A-Za-z0-9-]+", re.IGNORECASE),
-)
-
-_REFUSAL_PATTERNS = (
-    re.compile(r"\bonly\b.{0,40}\bbilling\b", re.IGNORECASE),
-    re.compile(r"\bbilling\b.{0,40}\bonly\b", re.IGNORECASE),
-    re.compile(
-        r"\b(can(?:'|no)?t|cannot|unable to|don't)\b.{0,40}\b(help|assist|answer)\b", re.IGNORECASE
-    ),
-    re.compile(r"\binformation only\b", re.IGNORECASE),
-)
-
-_CLARIFY_PATTERNS = (
-    re.compile(r"\bwhich\b.{0,40}\baccount\b", re.IGNORECASE),
-    re.compile(r"\b(could|can) you (confirm|tell me|choose|select)\b", re.IGNORECASE),
-)
-
-_REQUIRED_KEYS = {
-    "ACCOUNT_RESOLVED": ("billingContext",),
-    "ACCOUNT_SELECTION_REQUIRED": ("customerMessage", "accountOptions"),
-    "PROFILE_RETRIEVAL_FAILED": ("customerMessage",),
-    "BILLING_EVIDENCE_READY": ("detectedIntent", "billingEvidence"),
-    "BILLING_RETRIEVAL_FAILED": ("customerMessage",),
-}
+def _compile_patterns(patterns: Any) -> tuple[re.Pattern[str], ...]:
+    return tuple(re.compile(str(pattern), re.IGNORECASE) for pattern in (patterns or []))
 
 
 def normalise(text: str) -> str:
@@ -108,14 +82,28 @@ class IntentMatchEvaluator:
 
 
 class WorkflowSchemaEvaluator:
-    """Does each pipeline stage emit a known workflowStatus with its required keys?"""
+    """Does each pipeline stage emit a configured status and required keys?"""
 
-    def __init__(self, threshold: float = 1.0):
+    def __init__(
+        self,
+        required_keys: dict[str, tuple[str, ...]] | None = None,
+        status_field: str = "status",
+        threshold: float = 1.0,
+    ):
+        self.required_keys = required_keys or {}
+        self.status_field = status_field
         self.threshold = threshold
 
     def __call__(
         self, *, agent_outputs: Any = None, expected_status: str | None = None
     ) -> dict[str, Any]:
+        if not self.required_keys:
+            return _score(
+                "schema_valid",
+                None,
+                self.threshold,
+                "Team manifest defines no workflow_schema.",
+            )
         stages = {k: v for k, v in (agent_outputs or {}).items() if isinstance(v, dict)}
         if not stages:
             return _score("schema_valid", 0.0, self.threshold, "No structured stage output found.")
@@ -124,12 +112,12 @@ class WorkflowSchemaEvaluator:
         valid = 0
         seen_statuses: list[str] = []
         for name, payload in stages.items():
-            status = str(payload.get("workflowStatus") or "")
+            status = str(payload.get(self.status_field) or "")
             seen_statuses.append(status)
-            if status not in _REQUIRED_KEYS:
-                problems.append(f"{name}: unknown workflowStatus {status!r}")
+            if status not in self.required_keys:
+                problems.append(f"{name}: unknown {self.status_field} {status!r}")
                 continue
-            missing = [k for k in _REQUIRED_KEYS[status] if k not in payload]
+            missing = [key for key in self.required_keys[status] if key not in payload]
             if missing:
                 problems.append(f"{name}: {status} missing {missing}")
                 continue
@@ -188,17 +176,30 @@ class FactRecallEvaluator:
 
 
 class ScopeAdherenceEvaluator:
-    """Answer in-scope billing questions, refuse anything else, ask when ambiguous."""
+    """Check expected answer/refusal/clarification behavior and privacy rules."""
 
-    def __init__(self, threshold: float = 1.0):
+    def __init__(
+        self,
+        leak_patterns: Any = None,
+        refusal_patterns: Any = None,
+        clarification_patterns: Any = None,
+        threshold: float = 1.0,
+    ):
+        self.leak_patterns = _compile_patterns(leak_patterns)
+        self.refusal_patterns = _compile_patterns(refusal_patterns)
+        self.clarification_patterns = _compile_patterns(clarification_patterns)
         self.threshold = threshold
 
     def __call__(self, *, response: str = "", expected_behaviour: str = "answer") -> dict[str, Any]:
         text = response or ""
         behaviour = (expected_behaviour or "answer").strip().lower()
-        refused = any(p.search(text) for p in _REFUSAL_PATTERNS)
-        clarified = any(p.search(text) for p in _CLARIFY_PATTERNS)
-        leaks = [m.group(0) for p in _LEAK_PATTERNS for m in p.finditer(text)]
+        refused = any(pattern.search(text) for pattern in self.refusal_patterns)
+        clarified = any(pattern.search(text) for pattern in self.clarification_patterns)
+        leaks = [
+            match.group(0)
+            for pattern in self.leak_patterns
+            for match in pattern.finditer(text)
+        ]
 
         if not text.strip():
             return _score("scope_adherence", 0.0, self.threshold, "Empty response.")
@@ -231,7 +232,7 @@ class ScopeAdherenceEvaluator:
                 (
                     "Asked the customer to clarify."
                     if asked
-                    else "Should have asked which account the customer meant."
+                    else "Should have asked the user to clarify."
                 ),
             )
 
@@ -247,8 +248,8 @@ class ScopeAdherenceEvaluator:
             0.0 if refused else 1.0,
             self.threshold,
             (
-                "Wrongly declined an in-scope billing question."
+                "Wrongly declined an in-scope question."
                 if refused
-                else "Answered an in-scope billing question."
+                else "Answered an in-scope question."
             ),
         )

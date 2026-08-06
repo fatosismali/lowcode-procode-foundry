@@ -1,6 +1,6 @@
-"""Score the billing team locally, then publish the results to Foundry.
+"""Score a selected agent team locally, then publish results to Foundry.
 
-    python -m evals.run_evals
+    python -m evals.run_evals --team agent_teams/<team-directory>
 
 Runs the team, scores every row on this machine with the deterministic graders
 and the azure-ai-evaluation judges, prints the answer immediately, then
@@ -16,11 +16,12 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import yaml
 
-from .config import DATASETS_DIR, REPORTS_DIR, THRESHOLDS_FILE, EvalConfig
+from .config import EvalConfig, EvalSuite
 from .evaluators import (
     QUALITY_JUDGES,
     SAFETY_JUDGES,
@@ -37,14 +38,6 @@ from .graders import (
     WorkflowSchemaEvaluator,
 )
 from .target import TeamTarget
-
-# Fatos's spec: one set for the intent classifier, one for the billing agent,
-# one for the system as a whole including topic refusal.
-SETS = {
-    "intent_classifier": "intent_classifier.jsonl",
-    "billing_agent": "billing_agent.jsonl",
-    "system_e2e": "system_e2e.jsonl",
-}
 
 GRADERS = {
     "intent_match": IntentMatchEvaluator,
@@ -75,15 +68,33 @@ GRADER_INPUTS = {
 }
 
 
-def load_thresholds() -> dict[str, float]:
-    if not THRESHOLDS_FILE.is_file():
+def build_graders(suite: EvalSuite) -> dict[str, Any]:
+    scope = suite.scope
+    status_field = str(suite.output.get("status_field") or "status")
+    return {
+        "intent_match": IntentMatchEvaluator(),
+        "schema_valid": WorkflowSchemaEvaluator(
+            required_keys=suite.workflow_schema,
+            status_field=status_field,
+        ),
+        "fact_recall": FactRecallEvaluator(),
+        "scope_adherence": ScopeAdherenceEvaluator(
+            leak_patterns=scope.get("leak_patterns"),
+            refusal_patterns=scope.get("refusal_patterns"),
+            clarification_patterns=scope.get("clarification_patterns"),
+        ),
+    }
+
+
+def load_thresholds(suite: EvalSuite) -> dict[str, float]:
+    if not suite.thresholds_file.is_file():
         return {}
-    loaded = yaml.safe_load(THRESHOLDS_FILE.read_text(encoding="utf-8")) or {}
+    loaded = yaml.safe_load(suite.thresholds_file.read_text(encoding="utf-8")) or {}
     return loaded.get("criteria", {})
 
 
-def load_rows(dataset: str, limit: int | None = None) -> list[dict[str, Any]]:
-    path = DATASETS_DIR / dataset
+def load_rows(dataset: str | Path, limit: int | None = None) -> list[dict[str, Any]]:
+    path = Path(dataset)
     if not path.is_file():
         raise FileNotFoundError(f"Dataset not found: {path}")
     lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
@@ -133,15 +144,15 @@ def judge_items(items: list[dict[str, Any]], judges: dict[str, Any], workers: in
 def score_locally(
     rows: list[dict[str, Any]],
     target: TeamTarget,
+    graders: dict[str, Any],
     judges: dict[str, Any],
     workers: int = 8,
 ) -> list[dict[str, Any]]:
-    graders = {name: cls() for name, cls in GRADERS.items()}
     items: list[dict[str, Any]] = []
 
     print(f"  running the team over {len(rows)} rows...")
     for row in rows:
-        out = target(row["query"], row.get("account_reference"))
+        out = target(row)
         item = build_item(row, out)
         for name, grader in graders.items():
             scores = grader(**GRADER_INPUTS[name](row, out))
@@ -208,7 +219,7 @@ def publish(
         project.get_openai_client() as client,
     ):
         evaluation = client.evals.create(
-            name=f"vf-billing {set_name} {stamp}",
+            name=f"{config.suite.publish_name} {set_name} {stamp}",
             data_source_config=DataSourceConfigCustom(
                 type="custom", item_schema=item_schema(criteria)
             ),
@@ -232,14 +243,13 @@ def publish(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the Vodafone billing evaluations.")
+    parser = argparse.ArgumentParser(description="Run evaluations for a YAML-defined agent team.")
     parser.add_argument(
         "--set",
         default="all",
-        choices=[*SETS, "all"],
-        help="Which evaluation set to run.",
+        help="Evaluation set from the team's eval.yaml, or 'all'.",
     )
-    parser.add_argument("--team", help="Path to the generated team directory.")
+    parser.add_argument("--team", help="Path to a team directory containing evals/eval.yaml.")
     parser.add_argument("--project-endpoint", help="Foundry project endpoint for this team.")
     parser.add_argument("--judge-deployment", help="Model deployment used as LLM judge.")
     parser.add_argument(
@@ -268,6 +278,10 @@ def main(argv: list[str] | None = None) -> int:
         use_judges=not args.no_judge,
         use_safety=not args.no_safety,
     )
+    suite = config.suite
+    sets = suite.sets
+    if args.set != "all" and args.set not in sets:
+        parser.error(f"unknown set {args.set!r}; choose one of: {', '.join([*sets, 'all'])}")
 
     judge_names: list[str] = []
     if config.use_judges:
@@ -275,18 +289,18 @@ def main(argv: list[str] | None = None) -> int:
         if config.use_safety:
             judge_names += list(SAFETY_JUDGES)
 
-    rows = load_rows(args.dataset, args.limit)
     print(f"Team:    {config.team_dir}")
     print(f"Project: {config.foundry_project_endpoint}")
     print(f"Judge:   {config.judge_deployment if config.use_judges else 'disabled'}")
 
     target = TeamTarget(config)
+    graders = build_graders(suite)
     judges = build_local_judges(config, judge_names) if judge_names else {}
-    criteria = [*GRADERS, *judges]
-    thresholds = load_thresholds()
-    set_names = list(SETS) if args.set == "all" else [args.set]
+    criteria = [*graders, *judges]
+    thresholds = load_thresholds(suite)
+    set_names = list(sets) if args.set == "all" else [args.set]
 
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    suite.reports_dir.mkdir(parents=True, exist_ok=True)
     summary: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "project_endpoint": config.foundry_project_endpoint,
@@ -296,9 +310,9 @@ def main(argv: list[str] | None = None) -> int:
     failures = 0
 
     for set_name in set_names:
-        rows = load_rows(SETS[set_name], args.limit)
+        rows = load_rows(sets[set_name], args.limit)
         print(f"\n===== {set_name} ({len(rows)} rows, {len(criteria)} criteria) =====")
-        items = score_locally(rows, target, judges, args.concurrency)
+        items = score_locally(rows, target, graders, judges, args.concurrency)
         rates = pass_rates(items, criteria)
 
         print(f"\n  local results for {set_name}:")
@@ -315,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
             if not check["passed"]:
                 failures += 1
 
-        (REPORTS_DIR / f"{set_name}.jsonl").write_text(
+        (suite.reports_dir / f"{set_name}.jsonl").write_text(
             "\n".join(json.dumps(i, default=str) for i in items) + "\n", encoding="utf-8"
         )
 
@@ -332,10 +346,10 @@ def main(argv: list[str] | None = None) -> int:
             "report_url": report_url,
         }
 
-    (REPORTS_DIR / "summary.json").write_text(
+    (suite.reports_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, default=str), encoding="utf-8"
     )
-    print(f"\nPer-set results and summary written to {REPORTS_DIR}")
+    print(f"\nPer-set results and summary written to {suite.reports_dir}")
 
     if failures and not args.ignore_thresholds:
         print(f"Quality gate FAILED: {failures} criteria below threshold across all sets.")

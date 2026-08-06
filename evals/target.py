@@ -1,9 +1,7 @@
-"""Drives the team under test and returns per-agent output.
+"""Drive any YAML-defined team and return per-agent output.
 
-`run_team()` in the generated orchestrator flattens everything to
-"[agent] text" lines, which breaks when agents emit multi-line JSON. The intent
-labels live inside the investigation agent's JSON, so we re-run the same wiring
-here and keep the messages intact.
+The shared orchestrator flattens final output for terminal use. Evaluations
+re-run the same wiring here so agent messages and tool evidence remain intact.
 """
 
 from __future__ import annotations
@@ -75,17 +73,20 @@ def extract_json(text: str) -> dict | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-def build_task(query: str, sample_task: str | None, account_reference: str | None = None) -> str:
-    """Wrap the utterance in whatever input envelope team.yaml's own task uses."""
+def build_task(row: dict[str, Any], sample_task: str | None, task_config: dict[str, Any]) -> str:
+    """Map a dataset row into the team's configured task envelope."""
+    query = str(row.get("query") or "")
     try:
         payload = json.loads(sample_task or "")
     except ValueError:
         return query
-    if not isinstance(payload, dict) or "userQuery" not in payload:
+    if not isinstance(payload, dict):
         return query
-    payload["userQuery"] = query
-    if "selectedAccountReference" in payload:
-        payload["selectedAccountReference"] = account_reference
+    query_field = task_config.get("query_field")
+    if query_field:
+        payload[str(query_field)] = query
+    for dataset_field, task_field in (task_config.get("input_fields", {}) or {}).items():
+        payload[str(task_field)] = row.get(str(dataset_field))
     return json.dumps(payload)
 
 
@@ -264,18 +265,18 @@ class TeamTarget:
 
     def __init__(self, config: EvalConfig):
         self.config = config
+        self.suite = config.suite
         os.environ["FOUNDRY_PROJECT_ENDPOINT"] = config.foundry_project_endpoint
         self.orchestrator = load_orchestrator(config.team_dir)
-        self.team_config = TeamRuntimeConfig(Path(config.team_dir) / "team.yaml")
+        self.team_config = TeamRuntimeConfig(self.suite.team_yaml)
         team = self.orchestrator._load_yaml(self.team_config.team_yaml)
         self.sample_task = (team.get("orchestration", {}) or {}).get("task")
         self.tool_definitions = tool_definitions_from_yaml(self.orchestrator, self.team_config)
         self.system_message = system_message_from_yaml(self.orchestrator, self.team_config)
 
-    # No **kwargs here: evaluate() inspects this signature and treats a catch-all
-    # as a required dataset column.
-    def __call__(self, query: str, account_reference: str | None = None) -> dict:
-        task = build_task(query, self.sample_task, account_reference)
+    def __call__(self, row: dict[str, Any]) -> dict:
+        query = str(row.get("query") or "")
+        task = build_task(row, self.sample_task, self.suite.task)
         try:
             result = asyncio.run(run_team_traced(task, self.orchestrator, self.team_config))
         except Exception as exc:  # one bad row must not kill the whole run
@@ -284,13 +285,15 @@ class TeamTarget:
         stages = {a["name"]: a["json"] for a in result.agents}
         detected: list[str] = []
         statuses: list[str] = []
+        intents_field = str(self.suite.output.get("intents_field") or "")
+        status_field = str(self.suite.output.get("status_field") or "")
         for payload in stages.values():
             if not payload:
                 continue
-            if isinstance(payload.get("detectedIntent"), list):
-                detected = [str(i) for i in payload["detectedIntent"]]
-            if payload.get("workflowStatus"):
-                statuses.append(str(payload["workflowStatus"]))
+            if intents_field and isinstance(payload.get(intents_field), list):
+                detected = [str(i) for i in payload[intents_field]]
+            if status_field and payload.get(status_field):
+                statuses.append(str(payload[status_field]))
 
         return {
             "response": result.final_text,

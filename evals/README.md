@@ -1,106 +1,94 @@
-# Evaluations
+# Team Evaluations
 
-Tests the billing agent team. Scores everything locally so you get answers in a
-couple of minutes, then publishes the results to Foundry.
+The shared `evals` package evaluates any team selected with `--team`. It does
+not define datasets, workflow statuses, tool names, domain rules, or a default
+team. Each team owns those values in `evals/eval.yaml`.
 
 ## Setup
 
-Python 3.11 or 3.12 (x64) and the Azure CLI.
-
-Create the virtual environment **outside this repository**. One of the
-dependencies blocks imports that resolve from under the working directory, so a
-`.venv` inside the repo fails to import.
-
-**Windows**
+Create a Python 3.11 or 3.12 virtual environment outside the repository, then
+install both runtime and evaluation dependencies:
 
 ```powershell
-py -3.12 -m venv ..\evals-venv
-..\evals-venv\Scripts\Activate.ps1
-pip install -r evals\requirements.txt
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+python -m pip install -r evals/requirements.txt
+Copy-Item evals/.env.example evals/.env
 az login
-copy evals\.env.example evals\.env
 ```
 
-**macOS**
+Set `FOUNDRY_PROJECT_ENDPOINT` and `EVAL_JUDGE_DEPLOYMENT` in `evals/.env`.
+Select a team on every command with `--team`, or set `EVAL_TEAM_DIR`.
 
-```bash
-python3.12 -m venv ../evals-venv
-source ../evals-venv/bin/activate
-pip install -r evals/requirements.txt
-pip install -r requirements.txt
-az login
-cp evals/.env.example evals/.env
+## Team Contract
+
+A team that supports evaluations contains:
+
+```text
+<team>/
+  team.yaml
+  evals/
+    eval.yaml
+    thresholds.yaml
+    datasets/
+      smoke.jsonl
 ```
 
-Then edit `evals/.env` and set `FOUNDRY_PROJECT_ENDPOINT` to your Foundry
-project and `EVAL_JUDGE_DEPLOYMENT` to a model deployed in it.
+Example `eval.yaml`:
 
-Check it works without calling Azure:
+```yaml
+name: example-team
+team_yaml: ../team.yaml
+publish_name: example-team
+sets:
+  smoke: ./datasets/smoke.jsonl
+thresholds: ./thresholds.yaml
+reports_dir: ./reports
 
-```bash
+task:
+  query_field: request
+  input_fields:
+    reference: selectedReference
+
+output:
+  status_field: state
+  intents_field: labels
+
+workflow_schema:
+  READY: [payload]
+  FAILED: [message]
+
+scope:
+  leak_patterns:
+    - '\bSECRET-[0-9]+\b'
+  refusal_patterns:
+    - 'outside my scope'
+  clarification_patterns:
+    - 'which item'
+```
+
+Dataset rows must contain `id` and `query`. Optional generic expectations are
+`expected_intent`, `expected_status`, `expected_behaviour`, `required_facts`,
+`forbidden_facts`, and `category`. Any fields listed under `task.input_fields`
+are copied into the team's initial JSON task envelope.
+
+## Run
+
+```powershell
+python -m evals.run_evals --team agent_teams/<team-directory>
+python -m evals.run_evals --team agent_teams/<team-directory> --set smoke
+python -m evals.run_evals --team agent_teams/<team-directory> --no-publish
+python -m evals.run_evals --team agent_teams/<team-directory> --no-judge --limit 2
+```
+
+Results are written to the `reports_dir` configured by the selected team.
+Thresholds are evaluated from that team's threshold file. Use
+`--ignore-thresholds` when exploring incomplete suites.
+
+## Shared Tests
+
+```powershell
 python -m pytest evals/tests -q
 ```
 
-## Running
-
-```bash
-python -m evals.run_evals                          # all three sets
-python -m evals.run_evals --set intent_classifier
-python -m evals.run_evals --no-publish             # local only
-python -m evals.run_evals --limit 2                # quick smoke run
-python -m evals.run_evals --concurrency 4          # if the judge rate limits
-```
-
-Results print to the console, land in `evals/reports/`, and the command exits 1
-if anything falls below `thresholds.yaml`.
-
-Run the team on its own first, so a failure is clearly the team and not the
-evaluation:
-
-```bash
-python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml
-```
-
-## The three sets
-
-| Set | Rows | What it checks |
-| --- | --- | --- |
-| `intent_classifier` | 9 | Utterances resolve to the right intent. One row per label. |
-| `billing_agent` | 7 | Answers carry the right figures, in the right format, with nothing leaked. |
-| `system_e2e` | 6 | Billing questions answered, everything else refused. |
-
-## What gets checked
-
-Rule-based, in `graders.py`:
-
-- `intent_match` — the detected intent matches the expected one
-- `schema_valid` — each stage returns a valid envelope
-- `fact_recall` — the right figures appear, and figures from other scenarios do not
-- `scope_adherence` — answers, refuses or asks, as the row expects, without
-  leaking account numbers or internal IDs
-
-Model-judged, in `evaluators.py`: coherence, fluency, relevance, groundedness,
-intent resolution, task adherence, tool call accuracy, and five safety checks
-covering violence, sexual content, self-harm, hate and prompt injection.
-
-`thresholds.yaml` sets a minimum pass rate for each. Rows a check does not apply
-to are skipped rather than failed.
-
-## Test data
-
-Synthetic, based on the mock billing fixtures. It only asserts on values that
-are identical in both mock backends, so it stays valid whichever is wired up.
-
-To use different data, replace the JSONL files in `datasets/`. The field names
-are the only contract.
-
-## Notes
-
-- `evals/.env` holds your endpoint and must not be committed. It is gitignored.
-- The agent YAMLs ask for a `gpt-5` deployment. The team will not start unless
-  one exists with that exact name.
-- No agent prompt currently restricts the team to billing topics, so the refusal
-  rows are expected to fail until one is added.
-- A full run is a few hundred model calls. They run eight at a time; lower
-  `--concurrency` if you hit rate limits.
+These tests use a temporary synthetic manifest and do not depend on a specific
+team, agent, tool, status, or dataset.
