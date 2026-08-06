@@ -19,18 +19,30 @@ Billing:
 python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml
 ```
 
+The configured task runs as the first turn. The process then displays `You>`
+and keeps the same team sessions open for follow-up messages. Type `exit` or
+`quit` to close the chat.
+
 Triage:
 
 ```powershell
 python orchestrator.py --team-yaml agent_teams/vf_triage_team/team.yaml
 ```
 
-Override the task without editing YAML:
+Override the first chat turn without editing YAML:
 
 ```powershell
 python orchestrator.py `
   --team-yaml agent_teams/vf_billing_team/team.yaml `
   --task '{"userQuery":"Show my current bill","selectedAccountReference":"personal"}'
+```
+
+Run exactly one task and exit for scripts or smoke tests:
+
+```powershell
+python orchestrator.py `
+  --team-yaml agent_teams/vf_billing_team/team.yaml `
+  --once
 ```
 
 After installing the project, the equivalent console command is:

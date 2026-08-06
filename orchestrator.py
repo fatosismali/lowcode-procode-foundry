@@ -6,7 +6,7 @@ import importlib.util
 import logging
 import os
 from collections.abc import Awaitable, Callable
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -251,20 +251,15 @@ def _wire_workflow(
     raise ValueError(f"Unknown orchestration pattern: {pattern!r}")
 
 
-async def run_team(team_yaml: str | Path, task: str | None = None) -> str:
-    """Build and run a team directly from its YAML files."""
+@asynccontextmanager
+async def open_team(team_yaml: str | Path):
+    """Build a reusable team workflow and keep its tool resources open."""
     team_path, team, tool_registry = load_team(team_yaml)
     orchestration = team.get("orchestration", {}) or {}
     configured_pattern = orchestration.get("pattern")
     if not isinstance(configured_pattern, str) or not configured_pattern.strip():
         raise ValueError("team.yaml must define orchestration.pattern")
     pattern = configured_pattern.strip().lower().replace("-", "_")
-
-    selected_task = task if task is not None else orchestration.get("task")
-    if not isinstance(selected_task, str) or not selected_task.strip():
-        raise ValueError(
-            "No task provided. Set orchestration.task in team.yaml or pass --task."
-        )
 
     agent_refs = orchestration.get("agents", []) or []
     if not isinstance(agent_refs, list) or not agent_refs:
@@ -293,19 +288,58 @@ async def run_team(team_yaml: str | Path, task: str | None = None) -> str:
             by_name,
             orchestration,
         )
-        events = await workflow.run(selected_task)
-        outputs = events.get_outputs()
-        if not outputs:
-            return ""
-        final = outputs[-1]
-        messages = getattr(final, "messages", None)
-        if messages:
-            return "\n".join(
-                f"[{message.author_name or 'assistant'}] {message.text}"
-                for message in messages
-                if (message.text or "").strip()
+        yield workflow, orchestration.get("task")
+
+
+async def _run_workflow(workflow, task: str) -> str:
+    events = await workflow.run(task)
+    outputs = events.get_outputs()
+    if not outputs:
+        return ""
+    final = outputs[-1]
+    messages = getattr(final, "messages", None)
+    if messages:
+        return "\n".join(
+            f"[{message.author_name or 'assistant'}] {message.text}"
+            for message in messages
+            if (message.text or "").strip()
+        )
+    return str(final)
+
+
+async def run_team(team_yaml: str | Path, task: str | None = None) -> str:
+    """Build and run a team once."""
+    async with open_team(team_yaml) as (workflow, configured_task):
+        selected_task = task if task is not None else configured_task
+        if not isinstance(selected_task, str) or not selected_task.strip():
+            raise ValueError(
+                "No task provided. Set orchestration.task in team.yaml or pass --task."
             )
-        return str(final)
+        return await _run_workflow(workflow, selected_task)
+
+
+async def run_chat(team_yaml: str | Path, initial_task: str | None = None) -> None:
+    """Run a persistent terminal chat against one team workflow."""
+    async with open_team(team_yaml) as (workflow, configured_task):
+        first_task = initial_task if initial_task is not None else configured_task
+        if isinstance(first_task, str) and first_task.strip():
+            result = await _run_workflow(workflow, first_task)
+            print(f"\nTeam> {result}")
+
+        print("\nChat started. Type 'exit' or 'quit' to end the session.")
+        while True:
+            try:
+                user_input = await asyncio.to_thread(input, "\nYou> ")
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+            user_input = user_input.strip()
+            if user_input.lower() in {"exit", "quit"}:
+                break
+            if not user_input:
+                continue
+            result = await _run_workflow(workflow, user_input)
+            print(f"\nTeam> {result}")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -313,7 +347,12 @@ def _parse_args() -> argparse.Namespace:
         description="Run an Agent Framework team directly from team and agent YAML files."
     )
     parser.add_argument("--team-yaml", required=True, type=Path)
-    parser.add_argument("--task", help="Override orchestration.task from team.yaml")
+    parser.add_argument("--task", help="Override the initial task from team.yaml")
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Run one task and exit instead of opening an interactive chat",
+    )
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
     return parser.parse_args()
 
@@ -324,9 +363,12 @@ def main() -> None:
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    result = asyncio.run(run_team(args.team_yaml, args.task))
-    print("\n===== Team Result =====")
-    print(result)
+    if args.once:
+        result = asyncio.run(run_team(args.team_yaml, args.task))
+        print("\n===== Team Result =====")
+        print(result)
+    else:
+        asyncio.run(run_chat(args.team_yaml, args.task))
 
 
 if __name__ == "__main__":

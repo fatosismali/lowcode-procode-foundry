@@ -1,5 +1,6 @@
 """Tests for the shared YAML-driven orchestrator."""
 
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -44,6 +45,24 @@ def test_load_team_resolves_agents_in_yaml_order(team_yaml, agent_names, tool_na
 
     assert loaded_names == agent_names
     assert set(registry) == tool_names
+
+
+def test_billing_pipeline_propagates_profile_stop_statuses():
+    team_path, team, _ = orchestrator.load_team("agent_teams/vf_billing_team/team.yaml")
+    definitions = {
+        definition["name"]: definition["definition"]["instructions"]
+        for definition in (
+            orchestrator._load_yaml(orchestrator._resolve_path(team_path.parent, ref))
+            for ref in team["orchestration"]["agents"]
+        )
+    }
+
+    investigation = definitions["vf-billing-investigation-agent"]
+    response = definitions["vf-billing-response-agent"]
+    for status in ("ACCOUNT_SELECTION_REQUIRED", "PROFILE_RETRIEVAL_FAILED"):
+        assert status in investigation
+        assert status in response
+    assert "do not call get_billing_data" in investigation
 
 
 def test_sequential_workflow_passes_only_prior_agent_response(monkeypatch):
@@ -100,3 +119,30 @@ async def test_reasoning_safe_handoff_filters_cross_agent_tool_items():
 
     assert called
     assert [content.type for content in context.messages[0].contents] == ["text"]
+
+
+@pytest.mark.asyncio
+async def test_run_chat_reuses_workflow_until_exit(monkeypatch, capsys):
+    workflow = object()
+    tasks = []
+    replies = iter(["personal", "quit"])
+
+    @asynccontextmanager
+    async def fake_open_team(team_yaml):
+        yield workflow, "initial task"
+
+    async def fake_run_workflow(selected_workflow, task):
+        assert selected_workflow is workflow
+        tasks.append(task)
+        return f"response to {task}"
+
+    monkeypatch.setattr(orchestrator, "open_team", fake_open_team)
+    monkeypatch.setattr(orchestrator, "_run_workflow", fake_run_workflow)
+    monkeypatch.setattr("builtins.input", lambda prompt: next(replies))
+
+    await orchestrator.run_chat("team.yaml")
+
+    assert tasks == ["initial task", "personal"]
+    output = capsys.readouterr().out
+    assert "Team> response to initial task" in output
+    assert "Team> response to personal" in output

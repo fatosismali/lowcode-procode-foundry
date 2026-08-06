@@ -10,7 +10,9 @@ python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml
 python orchestrator.py --team-yaml agent_teams/vf_triage_team/team.yaml
 ```
 
-Use `--task` to override the YAML default for one invocation.
+The YAML task runs first, then the CLI waits at `You>` for follow-up messages
+while retaining the agents' sessions. Type `exit` or `quit` to stop. Use
+`--task` to override the first turn, or `--once` to run one task and exit.
 
 ## Add a team
 

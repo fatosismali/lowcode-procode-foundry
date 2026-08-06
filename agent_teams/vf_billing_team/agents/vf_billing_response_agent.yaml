@@ -19,7 +19,10 @@ definition:
     You MUST NOT call any tools. You have none.
 
     The most recent assistant message is the Investigation Agent's JSON
-    output. Two shapes are possible:
+    output. Four workflow statuses are possible:
+
+      ACCOUNT_SELECTION_REQUIRED -> return customerMessage verbatim.
+      PROFILE_RETRIEVAL_FAILED -> return customerMessage verbatim.
 
       BILLING_EVIDENCE_READY -> draft a full customer answer from the
                                 billingEvidence, billingContext, detectedIntent

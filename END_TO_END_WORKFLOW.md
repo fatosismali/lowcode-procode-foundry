@@ -56,7 +56,7 @@ python -m pytest tests/test_orchestrator.py -q
 Run a team directly:
 
 ```powershell
-python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml
+python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml --once
 ```
 
 No regeneration is required after changing `team.yaml` or `agents/*.yaml`. Restarting the process reloads all YAML and the tool registry.
@@ -83,7 +83,7 @@ A change should verify:
 Package or containerize the repository-level runtime with the selected team directories. Supply `FOUNDRY_PROJECT_ENDPOINT` through the deployment environment or a secret-backed configuration provider. Invoke the same entry point used locally:
 
 ```powershell
-foundry-team --team-yaml <path-to-team.yaml>
+foundry-team --team-yaml <path-to-team.yaml> --once
 ```
 
 The deployment artifact contains one orchestration implementation and any number of team definitions.
