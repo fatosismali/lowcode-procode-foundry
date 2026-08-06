@@ -44,9 +44,9 @@ The runtime also applies `ReasoningSafeHandoffMiddleware`. It removes cross-agen
 ## Code ownership
 
 - `orchestrator.py`: shared runtime behavior.
-- `generated_agents/*/team.yaml`: team topology and runtime paths.
-- `generated_agents/*/agents/*.yaml`: agent behavior and tool declarations.
-- `generated_agents/*/src/tools.py`: executable tool implementations.
+- `agent_teams/*/team.yaml`: team topology and runtime paths.
+- `agent_teams/*/agents/*.yaml`: agent behavior and tool declarations.
+- `agent_teams/*/src/tools.py`: executable tool implementations.
 - `tests/test_orchestrator.py`: shared runtime contract tests.
 
 Adding or changing an agent requires editing YAML. Adding or changing a function tool requires editing the team tool registry. No regeneration is required.

@@ -12,7 +12,7 @@ import orchestrator
     ("team_yaml", "agent_names", "tool_names"),
     [
         (
-            "generated_agents/vf_billing_team/team.yaml",
+            "agent_teams/vf_billing_team/team.yaml",
             [
                 "vf-billing-profile-agent",
                 "vf-billing-investigation-agent",
@@ -21,7 +21,7 @@ import orchestrator
             {"get_billing_profiles", "get_billing_data"},
         ),
         (
-            "generated_agents/vf_triage_team/team.yaml",
+            "agent_teams/vf_triage_team/team.yaml",
             ["vf-triage-tool-agent", "vf-comms-agent"],
             {
                 "get_incident",

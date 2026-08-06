@@ -6,8 +6,8 @@ From the repository root:
 
 ```powershell
 python -m pip install -r requirements.txt
-python orchestrator.py --team-yaml generated_agents/vf_billing_team/team.yaml
-python orchestrator.py --team-yaml generated_agents/vf_triage_team/team.yaml
+python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml
+python orchestrator.py --team-yaml agent_teams/vf_triage_team/team.yaml
 ```
 
 Use `--task` to override the YAML default for one invocation.

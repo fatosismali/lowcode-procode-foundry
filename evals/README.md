@@ -59,7 +59,7 @@ Run the team on its own first, so a failure is clearly the team and not the
 evaluation:
 
 ```bash
-python orchestrator.py --team-yaml generated_agents/vf_billing_team/team.yaml
+python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml
 ```
 
 ## The three sets

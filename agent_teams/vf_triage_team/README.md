@@ -8,7 +8,7 @@ Two-agent sequential incident workflow:
 Run from the repository root:
 
 ```powershell
-python orchestrator.py --team-yaml generated_agents/vf_triage_team/team.yaml
+python orchestrator.py --team-yaml agent_teams/vf_triage_team/team.yaml
 ```
 
 Agent behavior is defined under `agents/`. Incident, telemetry, impact, remediation, and notification mock tools are implemented in `src/tools.py` and exposed through `TOOL_REGISTRY`.

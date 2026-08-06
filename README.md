@@ -16,27 +16,27 @@ If Azure CLI is not authenticated, sign in to the tenant that owns the Foundry p
 Billing:
 
 ```powershell
-python orchestrator.py --team-yaml generated_agents/vf_billing_team/team.yaml
+python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml
 ```
 
 Triage:
 
 ```powershell
-python orchestrator.py --team-yaml generated_agents/vf_triage_team/team.yaml
+python orchestrator.py --team-yaml agent_teams/vf_triage_team/team.yaml
 ```
 
 Override the task without editing YAML:
 
 ```powershell
 python orchestrator.py `
-  --team-yaml generated_agents/vf_billing_team/team.yaml `
+  --team-yaml agent_teams/vf_billing_team/team.yaml `
   --task '{"userQuery":"Show my current bill","selectedAccountReference":"personal"}'
 ```
 
 After installing the project, the equivalent console command is:
 
 ```powershell
-foundry-team --team-yaml generated_agents/vf_billing_team/team.yaml
+foundry-team --team-yaml agent_teams/vf_billing_team/team.yaml
 ```
 
 ## Team contract
@@ -50,7 +50,7 @@ agents/*.yaml            Agent model, instructions, and tool declarations
 src/tools.py             Python implementations exposed through TOOL_REGISTRY
 ```
 
-The directory is still named `generated_agents/` for compatibility with the existing repository, but these are now source-controlled runtime definitions rather than generated SDK projects.
+Each subdirectory under `agent_teams/` is a source-controlled domain team, such as billing, roaming, or triage.
 
 A team file declares its runtime files and orchestration:
 
@@ -79,7 +79,7 @@ Supported patterns are `sequential`, `concurrent`, `group_chat`, and `handoff`.
 Copy the team example file and set its Foundry endpoint:
 
 ```powershell
-Copy-Item generated_agents/vf_billing_team/.env.example generated_agents/vf_billing_team/.env
+Copy-Item agent_teams/vf_billing_team/.env.example agent_teams/vf_billing_team/.env
 ```
 
 The runtime loads the `.env` adjacent to `team.yaml`. Real `.env` files are ignored by Git.

@@ -9,14 +9,14 @@ Three-agent sequential billing workflow:
 Run from the repository root:
 
 ```powershell
-python orchestrator.py --team-yaml generated_agents/vf_billing_team/team.yaml
+python orchestrator.py --team-yaml agent_teams/vf_billing_team/team.yaml
 ```
 
 To exercise the complete mock-data path when multiple profiles exist:
 
 ```powershell
 python orchestrator.py `
-  --team-yaml generated_agents/vf_billing_team/team.yaml `
+  --team-yaml agent_teams/vf_billing_team/team.yaml `
   --task '{"userQuery":"How much is my latest bill and has it been paid?","selectedAccountReference":"personal"}'
 ```
 

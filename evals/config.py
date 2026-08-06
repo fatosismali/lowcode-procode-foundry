@@ -18,7 +18,7 @@ DATASETS_DIR = EVALS_ROOT / "datasets"
 REPORTS_DIR = EVALS_ROOT / "reports"
 THRESHOLDS_FILE = EVALS_ROOT / "thresholds.yaml"
 
-DEFAULT_TEAM_DIR = REPO_ROOT / "generated_agents" / "vf_billing_team"
+DEFAULT_TEAM_DIR = REPO_ROOT / "agent_teams" / "vf_billing_team"
 DEFAULT_JUDGE_DEPLOYMENT = "gpt-5-mini"
 DEFAULT_JUDGE_API_VERSION = "2024-10-21"
 
