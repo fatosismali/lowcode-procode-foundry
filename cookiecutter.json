@@ -1,9 +1,0 @@
-{
-    "project_name": "{{ cookiecutter.project_name }}",
-    "project_slug": "{{ cookiecutter.project_name|lower|replace(' ', '_')|replace('-', '_') }}",
-    "description": "Low-code YAML → Pro-code Python agent using Agent Framework SDK",
-    "author_name": "Vodafone AI Team",
-    "python_version": "3.11",
-    "agent_framework_version": "~=1.8.0",
-    "maf_version": "1.8.0"
-}

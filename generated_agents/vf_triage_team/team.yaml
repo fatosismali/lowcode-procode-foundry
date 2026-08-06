@@ -4,8 +4,12 @@
 
 name: vf-triage-team
 description: 'Vodafone incident response team: triage the fault, then notify customers.'
+runtime:
+  env_file: ./.env
+  tools_file: ./src/tools.py
 orchestration:
   pattern: sequential
+  chain_only_agent_responses: true
   agents:
   - ./agents/vf_triage_tool_agent.yaml
   - ./agents/vf_comms_agent.yaml

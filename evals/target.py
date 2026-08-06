@@ -9,8 +9,9 @@ here and keep the messages intact.
 from __future__ import annotations
 
 import asyncio
-import importlib
+import importlib.util
 import json
+import os
 import sys
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
@@ -21,21 +22,39 @@ from .config import EvalConfig
 
 
 def load_orchestrator(team_dir: Path):
-    """Import <team_dir>/src/orchestrator.py as a package so its relative imports work."""
+    """Import the repository-level dynamic YAML orchestrator."""
     team_dir = Path(team_dir).resolve()
-    if not (team_dir / "src" / "orchestrator.py").is_file():
-        raise FileNotFoundError(f"No src/orchestrator.py under {team_dir}")
-    if str(team_dir) not in sys.path:
-        sys.path.insert(0, str(team_dir))
-    for name in ("src", "src.orchestrator", "src.config", "src.tools"):
-        sys.modules.pop(name, None)
+    orchestrator_path = next(
+        (parent / "orchestrator.py" for parent in team_dir.parents if (parent / "orchestrator.py").is_file()),
+        None,
+    )
+    if orchestrator_path is None:
+        raise FileNotFoundError(f"No repository orchestrator.py found above {team_dir}")
+    spec = importlib.util.spec_from_file_location("dynamic_team_orchestrator", orchestrator_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load {orchestrator_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     try:
-        return importlib.import_module("src.orchestrator")
+        spec.loader.exec_module(module)
+        return module
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             f"{exc.name!r} is missing, so the team under test cannot be loaded. "
-            f"Install its dependencies: pip install -r {team_dir / 'requirements.txt'}"
+            f"Install the runtime dependencies from the repository requirements.txt."
         ) from exc
+
+
+@dataclass(frozen=True)
+class TeamRuntimeConfig:
+    team_yaml: Path
+
+
+def resolve_agent_paths(orchestrator, team: dict, team_yaml: Path) -> list[Path]:
+    """Resolve ordered agent references using the shared runtime's path rules."""
+    team_yaml = Path(team_yaml)
+    refs = (team.get("orchestration", {}) or {}).get("agents", []) or []
+    return [orchestrator._resolve_path(team_yaml.parent, ref) for ref in refs]
 
 
 def extract_json(text: str) -> dict | None:
@@ -74,7 +93,7 @@ def system_message_from_yaml(orchestrator, team_config) -> str:
     """Short summary rather than the full prompts, which would swamp the judge."""
     team = orchestrator._load_yaml(team_config.team_yaml)
     lines = [team.get("description") or team.get("name", "")]
-    for path in orchestrator._resolve_agent_paths(team, team_config.team_yaml):
+    for path in resolve_agent_paths(orchestrator, team, team_config.team_yaml):
         agent_def = orchestrator._load_yaml(path)
         name = agent_def.get("name", "agent")
         description = agent_def.get("description") or (agent_def.get("definition", {}) or {}).get(
@@ -89,7 +108,7 @@ def tool_definitions_from_yaml(orchestrator, team_config) -> list[dict[str, Any]
     team = orchestrator._load_yaml(team_config.team_yaml)
     definitions: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for path in orchestrator._resolve_agent_paths(team, team_config.team_yaml):
+    for path in resolve_agent_paths(orchestrator, team, team_config.team_yaml):
         agent_def = orchestrator._load_yaml(path)
         for tool in (agent_def.get("definition", {}) or {}).get("tools", []) or []:
             name = tool.get("name")
@@ -182,20 +201,22 @@ class TeamResult:
 
 async def run_team_traced(task: str, orchestrator, team_config) -> TeamResult:
     """Same wiring as run_team(), but every message is kept."""
-    team = orchestrator._load_yaml(team_config.team_yaml)
+    team_path, team, tool_registry = orchestrator.load_team(team_config.team_yaml)
     orch = team.get("orchestration", {}) or {}
     pattern = (orch.get("pattern") or "sequential").strip().lower().replace("-", "_")
 
     async with AsyncExitStack() as stack:
         participants = []
         by_name = {}
-        for agent_path in orchestrator._resolve_agent_paths(team, team_config.team_yaml):
+        for agent_path in resolve_agent_paths(orchestrator, team, team_path):
             agent_def = orchestrator._load_yaml(agent_path)
-            agent = await orchestrator._build_agent(stack, team_config, agent_def)
+            agent = await orchestrator._build_agent(stack, agent_def, tool_registry)
             participants.append(agent)
             by_name[agent_def.get("name")] = agent
 
-        workflow = orchestrator._wire(pattern, participants, by_name, orch)
+        workflow = orchestrator._wire_workflow(
+            team.get("name", team_path.stem), pattern, participants, by_name, orch
+        )
         events = await workflow.run(task)
         outputs = events.get_outputs()
 
@@ -243,11 +264,9 @@ class TeamTarget:
 
     def __init__(self, config: EvalConfig):
         self.config = config
+        os.environ["FOUNDRY_PROJECT_ENDPOINT"] = config.foundry_project_endpoint
         self.orchestrator = load_orchestrator(config.team_dir)
-        self.team_config = self.orchestrator.TeamConfig(
-            foundry_project_endpoint=config.foundry_project_endpoint,
-            team_yaml=str(Path(config.team_dir) / "team.yaml"),
-        )
+        self.team_config = TeamRuntimeConfig(Path(config.team_dir) / "team.yaml")
         team = self.orchestrator._load_yaml(self.team_config.team_yaml)
         self.sample_task = (team.get("orchestration", {}) or {}).get("task")
         self.tool_definitions = tool_definitions_from_yaml(self.orchestrator, self.team_config)

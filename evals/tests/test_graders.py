@@ -270,7 +270,7 @@ class TestTargetHelpers:
 
 
 class _FakeOrchestrator:
-    """Stands in for a generated team's src/orchestrator.py."""
+    """Stands in for the repository-level dynamic orchestrator."""
 
     def __init__(self, team, agents):
         self._team = team
@@ -279,8 +279,8 @@ class _FakeOrchestrator:
     def _load_yaml(self, path):
         return self._agents.get(str(path), self._team)
 
-    def _resolve_agent_paths(self, team, team_yaml):
-        return list(self._agents)
+    def _resolve_path(self, base, path):
+        return path
 
 
 class TestToolExtraction:
@@ -311,7 +311,7 @@ class TestToolExtraction:
     def test_duplicate_tool_names_across_agents_are_collapsed(self):
         tool = {"type": "function", "name": "get_billing_data", "description": "x"}
         orchestrator = _FakeOrchestrator(
-            team={},
+            team={"orchestration": {"agents": ["a.yaml", "b.yaml"]}},
             agents={
                 "a.yaml": {"definition": {"tools": [tool]}},
                 "b.yaml": {"definition": {"tools": [tool]}},

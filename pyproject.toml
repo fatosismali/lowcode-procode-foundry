@@ -3,24 +3,22 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "foundry-yaml-to-sdk"
+name = "foundry-yaml-orchestrator"
 version = "1.0.0"
-description = "Transform Foundry YAML agent definitions into Python Agent Framework SDK implementations"
-readme = "README_TEMPLATE.md"
+description = "Run Microsoft Foundry agent teams directly from YAML definitions"
+readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Vodafone AI Team", email = "ai@vodafone.com"}
 ]
-keywords = ["agent", "framework", "foundry", "yaml", "codegen", "agent-framework"]
+keywords = ["agent", "framework", "foundry", "yaml", "orchestration"]
 
 dependencies = [
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "pyyaml>=6.0",
-    "jinja2>=3.1.0",
-    "click>=8.1.0",
-    "colorama>=0.4.6",
+    "agent-framework>=1.11.0",
+    "azure-identity>=1.14.0",
+    "PyYAML>=6.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -34,16 +32,15 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Vodafone/foundry-yaml-to-sdk"
-Repository = "https://github.com/Vodafone/foundry-yaml-to-sdk.git"
-Documentation = "https://github.com/Vodafone/foundry-yaml-to-sdk/blob/main/README_TEMPLATE.md"
+Homepage = "https://github.com/fatosismali/lowcode-procode-foundry"
+Repository = "https://github.com/fatosismali/lowcode-procode-foundry.git"
+Documentation = "https://github.com/fatosismali/lowcode-procode-foundry/blob/main/README.md"
 
 [project.scripts]
-foundry-yaml-to-sdk = "yaml_to_sdk.__main__:main"
+foundry-team = "orchestrator:main"
 
-[tool.hatch.version]
-path = "yaml_to_sdk/__init__.py"
-pattern = '__version__ = "(?P<version>[^"]+)"'
+[tool.hatch.build.targets.wheel]
+only-include = ["orchestrator.py"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

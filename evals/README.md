@@ -17,7 +17,7 @@ dependencies blocks imports that resolve from under the working directory, so a
 py -3.12 -m venv ..\evals-venv
 ..\evals-venv\Scripts\Activate.ps1
 pip install -r evals\requirements.txt
-pip install -r generated_agents\vf_billing_team\requirements.txt
+pip install -r requirements.txt
 az login
 copy evals\.env.example evals\.env
 ```
@@ -28,7 +28,7 @@ copy evals\.env.example evals\.env
 python3.12 -m venv ../evals-venv
 source ../evals-venv/bin/activate
 pip install -r evals/requirements.txt
-pip install -r generated_agents/vf_billing_team/requirements.txt
+pip install -r requirements.txt
 az login
 cp evals/.env.example evals/.env
 ```
@@ -59,7 +59,7 @@ Run the team on its own first, so a failure is clearly the team and not the
 evaluation:
 
 ```bash
-cd generated_agents/vf_billing_team && python -m src.orchestrator
+python orchestrator.py --team-yaml generated_agents/vf_billing_team/team.yaml
 ```
 
 ## The three sets

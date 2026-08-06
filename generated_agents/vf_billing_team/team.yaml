@@ -5,8 +5,12 @@
 name: vf-billing-team
 description: 'Vodafone billing customer-support team: resolve account, investigate
   billing evidence, respond to the customer.'
+runtime:
+  env_file: ./.env
+  tools_file: ./src/tools.py
 orchestration:
   pattern: sequential
+  chain_only_agent_responses: true
   agents:
   - ./agents/vf_billing_profile_agent.yaml
   - ./agents/vf_billing_investigation_agent.yaml
