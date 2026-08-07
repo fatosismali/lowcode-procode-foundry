@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Mock MCP server for Vodafone care-billing APIs (getBillingProfiles, getMonthBillSummary, getPreviousBills, getSubscriptionDetails)"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp[cli]>=1.2.0",
+    "mcp[cli]==1.29.0",
     "uvicorn>=0.30.0",
 ]
 

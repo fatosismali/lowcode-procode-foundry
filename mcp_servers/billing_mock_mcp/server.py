@@ -10,6 +10,7 @@ end to end without the real backend.
 
 Tools exposed to the agent:
   - get_billing_profiles      (upstream: getBillingProfiles)
+    - get_billing_data          (consolidates bill, history, and subscription data)
   - get_month_bill_summary    (upstream: getMonthBillSummary)
   - get_previous_bills        (upstream: getPreviousBills)
   - get_subscription_details  (upstream: getSubscriptionDetails)
@@ -92,21 +93,129 @@ def _respond(tool: str, scenario: str, echo: dict[str, Any] | None = None) -> di
 
 @mcp.tool()
 def get_billing_profiles(
-    msisdn: Annotated[str, "Customer mobile number (MSISDN), e.g. 447700900123"],
+    selectedAccountReference: Annotated[
+        str,
+        "Optional account selection such as 'personal', 'business', or the last four digits.",
+    ] = "",
+    msisdn: Annotated[str, "Customer mobile number (MSISDN), if available"] = "",
     account_no: Annotated[str, "Billing account number (optional)"] = "",
     scenario: Annotated[
         str,
         "Mock scenario: 'single_account' (one billing profile), 'multi_account' "
         "(more than one), or 'no_response' (backend failure).",
-    ] = "single_account",
+    ] = "multi_account",
 ) -> dict[str, Any]:
     """Mock of `getBillingProfiles`. Returns the customer's billing profile list
     so the agent can decide between a single-account and multi-account journey."""
-    return _respond(
+    result = _respond(
         "get_billing_profiles",
         scenario,
-        {"msisdn": msisdn, "accountNo": account_no},
+        {
+            "selectedAccountReference": selectedAccountReference,
+            "msisdn": msisdn,
+            "accountNo": account_no,
+        },
     )
+    profiles = (result.get("output") or {}).get("billProfileList") or []
+    result["profiles"] = profiles
+    reference = selectedAccountReference.strip().lower()
+    if reference:
+        for profile in profiles:
+            last_four = str(profile.get("accountNo", ""))[-4:]
+            candidates = {
+                str(profile.get("billingProfileId", "")).lower(),
+                str(profile.get("accountName", "")).lower(),
+                str(profile.get("accountType", "")).lower(),
+                last_four,
+                f"acct-ending-{last_four}",
+                f"account ending in {last_four}",
+            }
+            if profile.get("accountType") == "consumer":
+                candidates.update({"personal", "personal account"})
+            if reference in candidates or any(reference in candidate for candidate in candidates):
+                result["matchedProfileId"] = profile.get("billingProfileId")
+                break
+    return result
+
+
+@mcp.tool()
+def get_billing_data(
+    billing_profile_id: Annotated[
+        str,
+        "Internal billing profile ID returned by get_billing_profiles.",
+    ],
+    data_types: Annotated[
+        list[str],
+        "One or more of: current_bill, previous_bills, subscriptions.",
+    ],
+) -> dict[str, Any]:
+    """Retrieve consolidated billing evidence for the investigation agent."""
+    profile_scenarios = _FIXTURES.get("get_billing_profiles", {})
+    profiles = (
+        (profile_scenarios.get("multi_account", {}).get("output") or {}).get("billProfileList")
+        or []
+    )
+    profile = next(
+        (item for item in profiles if item.get("billingProfileId") == billing_profile_id),
+        None,
+    )
+    if profile is None:
+        return {
+            data_type: {
+                "status": {"httpStatus": 404, "reason": "profile not found"},
+                "available": False,
+            }
+            for data_type in data_types
+            if data_type in {"current_bill", "previous_bills", "subscriptions"}
+        }
+
+    msisdn = "447700900123"
+    account_no = str(profile.get("accountNo", ""))
+    result: dict[str, Any] = {}
+    for data_type in dict.fromkeys(data_types):
+        if data_type == "current_bill":
+            source = get_month_bill_summary(msisdn, account_no, scenario="pending")
+            output = source.get("output") or {}
+            result[data_type] = {
+                "status": source.get("status", {}),
+                "available": source.get("status", {}).get("httpStatus") == 200,
+                "billType": output.get("billType"),
+                "billStatus": output.get("billStatus"),
+                "billMonth": (output.get("billMonth") or {}).get("fullMonth"),
+                "billDateRange": output.get("formattedBillDateRange"),
+                "totalLabel": output.get("totalLabel"),
+                "inPlanAmount": (output.get("inPlan") or {}).get("value"),
+                "outOfPlanAmount": (output.get("totalOutOfPlanCharges") or {}).get("value"),
+                "totalAmount": (output.get("totalAmount") or {}).get("value"),
+                "numericTotalAmount": (output.get("totalAmount") or {}).get("amount"),
+                "paymentMessage": output.get("paymentMethodMessage"),
+                "isFirstBill": output.get("isFirstBill", False),
+            }
+        elif data_type == "previous_bills":
+            source = get_previous_bills(msisdn, account_no)
+            output = source.get("output") or {}
+            result[data_type] = {
+                "status": source.get("status", {}),
+                "available": source.get("status", {}).get("httpStatus") == 200,
+                "items": [
+                    {
+                        "month": item.get("monthMMM") or item.get("month"),
+                        "billStatus": item.get("billStatus"),
+                        "totalAmount": (item.get("totalAmount") or {}).get("value"),
+                        "numericTotalAmount": (item.get("totalAmount") or {}).get("amount"),
+                    }
+                    for item in output.get("previousBillSummary", [])
+                ],
+            }
+        elif data_type == "subscriptions":
+            source = get_subscription_details(msisdn, account_no)
+            output = source.get("output") or {}
+            result[data_type] = {
+                "status": source.get("status", {}),
+                "available": source.get("status", {}).get("httpStatus") == 200,
+                "items": output.get("subscriptionDetails", []),
+            }
+    return result
 
 
 @mcp.tool()
@@ -162,8 +271,15 @@ def get_subscription_details(
 def _selftest() -> None:
     """Print one sample response per tool/scenario without starting a server."""
     samples = [
-        ("get_billing_profiles", get_billing_profiles("447700900123", scenario="single_account")),
-        ("get_billing_profiles/multi", get_billing_profiles("447700900123", scenario="multi_account")),
+        ("get_billing_profiles", get_billing_profiles(scenario="single_account")),
+        ("get_billing_profiles/multi", get_billing_profiles(scenario="multi_account")),
+        (
+            "get_billing_data",
+            get_billing_data(
+                "BP-0123456789-01",
+                ["current_bill", "previous_bills", "subscriptions"],
+            ),
+        ),
         ("get_month_bill_summary/paid", get_month_bill_summary("447700900123", scenario="paid")),
         ("get_month_bill_summary/unpaid", get_month_bill_summary("447700900123", scenario="unpaid")),
         ("get_previous_bills", get_previous_bills("447700900123")),

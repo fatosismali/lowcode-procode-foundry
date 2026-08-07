@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from azure.core.credentials import AccessToken
 
-from evals.config import EvalSuite
+from evals.auth import CachedAzureCliCredential
+from evals.config import EvalConfig, EvalSuite
 from evals.evaluators import (
     ALL_JUDGES,
     QUALITY_JUDGES,
@@ -35,6 +38,7 @@ from evals.run_evals import (
     pass_rates,
 )
 from evals.target import (
+    TeamTarget,
     build_messages,
     build_task,
     extract_json,
@@ -111,6 +115,55 @@ def test_eval_suite_requires_sets(tmp_path):
     (eval_dir / "eval.yaml").write_text("name: empty\n", encoding="utf-8")
     with pytest.raises(ValueError, match="at least one set"):
         EvalSuite.load(tmp_path / "team")
+
+
+def test_eval_config_enforces_azure_cli_auth(monkeypatch, tmp_path):
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://unrelated.openai.azure.com")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "unrelated-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "unrelated-key")
+    monkeypatch.delenv("EVAL_JUDGE_ENDPOINT", raising=False)
+    monkeypatch.delenv("EVAL_JUDGE_API_KEY", raising=False)
+
+    config = EvalConfig.from_env(
+        project_endpoint="https://sample.services.ai.azure.com/api/projects/demo",
+        team_dir=tmp_path,
+    )
+
+    assert config.judge_endpoint == "https://sample.services.ai.azure.com"
+    assert "api_key" not in config.judge_model_config()
+    assert "AZURE_OPENAI_API_KEY" not in os.environ
+    assert "OPENAI_API_KEY" not in os.environ
+
+
+def test_eval_config_rejects_explicit_judge_key(monkeypatch, tmp_path):
+    monkeypatch.setenv("EVAL_JUDGE_API_KEY", "forbidden-key")
+
+    with pytest.raises(ValueError, match="Azure CLI authentication"):
+        EvalConfig.from_env(
+            project_endpoint="https://sample.services.ai.azure.com/api/projects/demo",
+            team_dir=tmp_path,
+        )
+
+
+def test_cached_cli_credential_reuses_token(monkeypatch):
+    calls = []
+
+    class FakeAzureCliCredential:
+        def get_token(self, *scopes, **kwargs):
+            calls.append((scopes, kwargs))
+            return AccessToken("token", 4_102_444_800)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("evals.auth.AzureCliCredential", FakeAzureCliCredential)
+    credential = CachedAzureCliCredential()
+
+    first = credential.get_token("https://ai.azure.com/.default")
+    second = credential.get_token("https://ai.azure.com/.default")
+
+    assert first is second
+    assert len(calls) == 1
 
 
 class TestIntentMatch:
@@ -209,6 +262,26 @@ class TestTargetHelpers:
 
     def test_build_task_falls_back_to_query_for_plain_task(self):
         assert build_task({"query": "Find item"}, "plain", {}) == "Find item"
+
+    def test_team_target_reports_row_timeout(self, monkeypatch):
+        async def slow_team(*args):
+            import asyncio
+
+            await asyncio.sleep(1)
+
+        monkeypatch.setattr("evals.target.run_team_traced", slow_team)
+        target = object.__new__(TeamTarget)
+        target.row_timeout = 0.01
+        target.orchestrator = object()
+        target.team_config = object()
+        target.sample_task = None
+        target.suite = SimpleNamespace(task={}, output={})
+        target.tool_definitions = []
+        target.system_message = ""
+
+        result = target({"query": "Find item"})
+
+        assert result["error"] == "Team execution timed out after 0.01s"
 
 
 class _FakeOrchestrator:

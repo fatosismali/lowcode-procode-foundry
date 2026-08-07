@@ -186,34 +186,9 @@ definition:
     effort: low
 
   tools:
-    - type: function
-      name: get_billing_data
-      description: |
-        Consolidated billing data retrieval. Fetches any combination of the
-        latest bill summary, previous bill history and subscription/plan
-        details for a given billing profile in a single call. Returns a
-        mapping keyed by each requested data_type, plus a per-source status
-        object containing httpStatus.
-      parameters:
-        type: object
-        properties:
-          billing_profile_id:
-            type: string
-            description: Internal billing profile ID from the Profile Resolver.
-          data_types:
-            type: array
-            description: One or more billing data sources to retrieve.
-            minItems: 1
-            items:
-              type: string
-              enum:
-                - current_bill
-                - previous_bills
-                - subscriptions
-        required:
-          - billing_profile_id
-          - data_types
-        additionalProperties: false
-      strict: true
+    - type: mcp
+      server_label: billing_mock
+      server_url: https://billing-mock-mcp.lemonisland-dc9bf8c5.uksouth.azurecontainerapps.io/mcp
+      project_connection_id: billing-mock-mcp
 
 status: active

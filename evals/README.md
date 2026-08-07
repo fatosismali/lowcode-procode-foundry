@@ -18,6 +18,10 @@ az login
 
 Set `FOUNDRY_PROJECT_ENDPOINT` and `EVAL_JUDGE_DEPLOYMENT` in `evals/.env`.
 Select a team on every command with `--team`, or set `EVAL_TEAM_DIR`.
+The judge endpoint is derived from the Foundry project by default. Use
+`EVAL_JUDGE_ENDPOINT` only when the judge deployment belongs to another
+resource. All Azure authentication uses the active Azure CLI session. API keys
+are rejected; run `az login` before starting an evaluation.
 
 ## Team Contract
 
@@ -78,11 +82,13 @@ python -m evals.run_evals --team agent_teams/<team-directory>
 python -m evals.run_evals --team agent_teams/<team-directory> --set smoke
 python -m evals.run_evals --team agent_teams/<team-directory> --no-publish
 python -m evals.run_evals --team agent_teams/<team-directory> --no-judge --limit 2
+python -m evals.run_evals --team agent_teams/<team-directory> --row-timeout 180
 ```
 
 Results are written to the `reports_dir` configured by the selected team.
 Thresholds are evaluated from that team's threshold file. Use
-`--ignore-thresholds` when exploring incomplete suites.
+`--ignore-thresholds` when exploring incomplete suites. Each team row reports
+its elapsed time while running and is stopped after five minutes by default.
 
 ## Shared Tests
 

@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vodafone Billing Assistant</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #181818;
+      --muted: #66615d;
+      --paper: #f5f3ef;
+      --surface: #ffffff;
+      --line: #d9d4ce;
+      --brand: #e60000;
+      --brand-dark: #b40000;
+      --assistant: #ece9e4;
+      --error: #9f1d1d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(90deg, rgba(24, 24, 24, 0.025) 1px, transparent 1px),
+        linear-gradient(rgba(24, 24, 24, 0.025) 1px, transparent 1px),
+        var(--paper);
+      background-size: 24px 24px;
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px clamp(18px, 4vw, 48px);
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--brand);
+      color: white;
+      font: 700 20px/1 Georgia, serif;
+    }
+    h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0; }
+
+    .endpoint {
+      width: min(460px, 52vw);
+      border: 1px solid var(--line);
+      padding: 9px 11px;
+      background: var(--surface);
+      color: var(--muted);
+      font: 13px/1.2 Consolas, monospace;
+    }
+
+    #messages {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 32px clamp(16px, 4vw, 32px);
+      overflow-y: auto;
+    }
+
+    .welcome { max-width: 560px; margin: 12vh auto 0; text-align: center; }
+    .welcome h2 { margin: 0 0 10px; font-size: clamp(28px, 5vw, 46px); letter-spacing: 0; }
+    .welcome p { margin: 0; color: var(--muted); font: 16px/1.6 Verdana, sans-serif; }
+
+    .message { display: flex; margin: 18px 0; animation: reveal 180ms ease-out; }
+    .message.user { justify-content: flex-end; }
+    .bubble {
+      max-width: min(680px, 88%);
+      padding: 13px 16px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 15px/1.55 Verdana, sans-serif;
+    }
+    .assistant .bubble { background: var(--assistant); border: 1px solid var(--line); }
+    .user .bubble { background: var(--brand); color: white; }
+    .error .bubble { color: var(--error); border-color: #e5baba; background: #fff2f2; }
+    .agent-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font: 700 11px/1.2 Verdana, sans-serif;
+      text-transform: uppercase;
+    }
+    .working {
+      width: min(860px, 100%);
+      margin: 4px auto 0;
+      color: var(--muted);
+      font: 13px/1.4 Verdana, sans-serif;
+    }
+    .working::before {
+      content: "";
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: var(--brand);
+      animation: pulse 1s ease-in-out infinite alternate;
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      padding: 16px clamp(16px, 4vw, 48px) 20px;
+    }
+    form { width: min(860px, 100%); margin: 0 auto; display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    textarea {
+      min-height: 48px;
+      max-height: 160px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 13px 14px;
+      color: var(--ink);
+      background: var(--surface);
+      font: 15px/1.4 Verdana, sans-serif;
+    }
+    textarea:focus, .endpoint:focus { outline: 2px solid rgba(230, 0, 0, 0.25); border-color: var(--brand); }
+    button {
+      min-width: 52px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 18px;
+      background: var(--brand);
+      color: white;
+      font: 700 14px Verdana, sans-serif;
+      cursor: pointer;
+    }
+    button:hover { background: var(--brand-dark); }
+    button:disabled { opacity: 0.55; cursor: wait; }
+
+    @keyframes reveal { from { opacity: 0; transform: translateY(5px); } }
+    @keyframes pulse { to { opacity: 0.3; transform: scale(0.8); } }
+
+    @media (max-width: 650px) {
+      header { align-items: stretch; flex-direction: column; }
+      .endpoint { width: 100%; }
+      #messages { padding-top: 18px; }
+      .welcome { margin-top: 8vh; }
+      .bubble { max-width: 94%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">V</div>
+        <h1>Billing Assistant</h1>
+      </div>
+      <input id="endpoint" class="endpoint" aria-label="Orchestrator endpoint" value="{{ default_endpoint }}">
+    </header>
+
+    <main id="messages" aria-live="polite">
+      <section id="welcome" class="welcome">
+        <h2>What can I check for you?</h2>
+        <p>Ask about a bill, charge, payment, plan, or recent account activity.</p>
+      </section>
+    </main>
+
+    <footer>
+      <form id="chat-form">
+        <textarea id="message" rows="1" placeholder="Ask about your bill..." aria-label="Message" required></textarea>
+        <button id="send" type="submit" aria-label="Send message">Send</button>
+      </form>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById("chat-form");
+    const messageInput = document.getElementById("message");
+    const endpointInput = document.getElementById("endpoint");
+    const messages = document.getElementById("messages");
+    const sendButton = document.getElementById("send");
+    let sessionId = null;
+    let agentBubbles = new Map();
+
+    function displayAgentName(name) {
+      return (name || "Assistant")
+        .replace(/^executor_/, "")
+        .replaceAll("-", " ")
+        .replaceAll("_", " ");
+    }
+
+    function addMessage(text, role, isError = false, agent = null) {
+      document.getElementById("welcome")?.remove();
+      const row = document.createElement("div");
+      row.className = `message ${role}${isError ? " error" : ""}`;
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      if (agent) {
+        const label = document.createElement("span");
+        label.className = "agent-label";
+        label.textContent = displayAgentName(agent);
+        bubble.appendChild(label);
+      }
+      bubble.appendChild(document.createTextNode(text));
+      row.appendChild(bubble);
+      messages.appendChild(row);
+      row.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+
+    function updateAgentMessage(agent, text, mode = "append") {
+      const key = agent || "assistant";
+      let entry = agentBubbles.get(key);
+      if (!entry) {
+        document.getElementById("welcome")?.remove();
+        const row = document.createElement("div");
+        row.className = "message assistant";
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        const label = document.createElement("span");
+        label.className = "agent-label";
+        label.textContent = displayAgentName(agent);
+        const content = document.createElement("span");
+        bubble.append(label, content);
+        row.appendChild(bubble);
+        messages.appendChild(row);
+        entry = { row, content };
+        agentBubbles.set(key, entry);
+      }
+      if (mode === "replace") {
+        entry.content.textContent = text;
+      } else {
+        entry.content.append(document.createTextNode(text));
+      }
+      entry.row.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+
+    function setWorking(agent = null, message = null) {
+      let indicator = document.getElementById("working");
+      if (!agent) {
+        indicator?.remove();
+        return;
+      }
+      if (!indicator) {
+        indicator = document.createElement("div");
+        indicator.id = "working";
+        indicator.className = "working";
+        messages.appendChild(indicator);
+      }
+      indicator.textContent = message || `${displayAgentName(agent)} is working...`;
+      indicator.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+
+    function parseEvent(block) {
+      let eventType = "message";
+      const data = [];
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) eventType = line.slice(6).trim();
+        if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
+      }
+      return { eventType, data: JSON.parse(data.join("\n")) };
+    }
+
+    function handleEvent(eventType, event) {
+      if (event.session_id) sessionId = event.session_id;
+      if (eventType === "status" && event.status === "started") {
+        setWorking(event.agent);
+      } else if (eventType === "status" && event.status === "completed") {
+        setWorking(null);
+      } else if (eventType === "activity") {
+        const agent = displayAgentName(event.agent);
+        const tool = event.tool || "tool";
+        const message = event.status === "completed"
+          ? `${agent} completed ${tool}.`
+          : `${agent} is calling ${tool}...`;
+        setWorking(event.agent || "assistant", message);
+      } else if (eventType === "agent_response") {
+        updateAgentMessage(event.agent, event.text, event.mode);
+        setWorking(
+          event.agent || "assistant",
+          `${displayAgentName(event.agent)} is responding...`
+        );
+      } else if (eventType === "done") {
+        setWorking(null);
+      } else if (eventType === "error") {
+        throw new Error(event.message || "The orchestrator stream failed.");
+      }
+    }
+
+    async function sendMessage(event) {
+      event.preventDefault();
+      const message = messageInput.value.trim();
+      if (!message || sendButton.disabled) return;
+
+      addMessage(message, "user");
+      agentBubbles = new Map();
+      messageInput.value = "";
+      sendButton.disabled = true;
+      setWorking("orchestrator");
+
+      try {
+        const response = await fetch("/api/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            endpoint: endpointInput.value.trim(),
+            session_id: sessionId
+          })
+        });
+        if (!response.ok) {
+          const body = await response.json();
+          throw new Error(body.error || `Request failed (${response.status})`);
+        }
+        if (!response.body) throw new Error("Streaming is not supported by this browser.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+          const blocks = buffer.split(/\r?\n\r?\n/);
+          buffer = blocks.pop() || "";
+          for (const block of blocks) {
+            if (!block.trim()) continue;
+            const event = parseEvent(block);
+            handleEvent(event.eventType, event.data);
+          }
+          if (done) break;
+        }
+      } catch (error) {
+        setWorking(null);
+        addMessage(error.message || "Unable to reach the orchestrator.", "assistant", true);
+      } finally {
+        setWorking(null);
+        sendButton.disabled = false;
+        messageInput.focus();
+      }
+    }
+
+    form.addEventListener("submit", sendMessage);
+    messageInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+  </script>
+</body>
+</html>

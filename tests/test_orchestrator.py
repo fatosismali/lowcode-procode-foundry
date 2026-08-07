@@ -1,12 +1,65 @@
 """Tests for the shared YAML-driven orchestrator."""
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import AsyncExitStack, asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
 from agent_framework import Message
 
 import orchestrator
+
+
+def test_billing_agents_use_mcp_tools_exposed_by_server():
+    from mcp_servers.billing_mock_mcp.server import mcp
+
+    team_path, team, _ = orchestrator.load_team("agent_teams/vf_billing_team/team.yaml")
+    definitions = [
+        orchestrator._load_yaml(orchestrator._resolve_path(team_path.parent, ref))
+        for ref in team["orchestration"]["agents"]
+    ]
+    profile_tools = definitions[0]["definition"]["tools"]
+    investigation_tools = definitions[1]["definition"]["tools"]
+    response_tools = definitions[2]["definition"]["tools"]
+
+    assert profile_tools[0]["type"] == "mcp"
+    assert investigation_tools[0]["type"] == "mcp"
+    assert profile_tools[0]["server_url"].endswith("/mcp")
+    assert investigation_tools[0]["server_url"] == profile_tools[0]["server_url"]
+    assert response_tools == []
+
+    registered = {tool.name: tool.inputSchema for tool in asyncio.run(mcp.list_tools())}
+    assert "selectedAccountReference" in registered["get_billing_profiles"]["properties"]
+    assert set(registered["get_billing_data"]["required"]) == {
+        "billing_profile_id",
+        "data_types",
+    }
+
+
+@pytest.mark.asyncio
+async def test_client_resources_close_with_workflow_stack():
+    closed = []
+
+    class AsyncResource:
+        def __init__(self, name):
+            self.name = name
+
+        async def close(self):
+            closed.append(self.name)
+
+    class Credential:
+        def close(self):
+            closed.append("credential")
+
+    client = SimpleNamespace(
+        project_client=AsyncResource("project"),
+        client=AsyncResource("openai"),
+    )
+    async with AsyncExitStack() as stack:
+        orchestrator._register_client_resources(stack, client, Credential())
+        assert closed == []
+
+    assert closed == ["openai", "project", "credential"]
 
 
 @pytest.mark.parametrize(
@@ -90,6 +143,7 @@ def test_sequential_workflow_passes_only_prior_agent_response(monkeypatch):
     assert captured == {
         "participants": participants,
         "chain_only_agent_responses": True,
+        "intermediate_output_from": "all_other",
     }
 
 

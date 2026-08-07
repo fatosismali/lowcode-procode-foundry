@@ -10,16 +10,12 @@ LLM decide which billing tool to call, and prints a plain-language answer.
                         ▲                          │
                         └────── tool results ──────┘
 
-Model configuration (pick ONE):
+Model configuration:
 
   Azure OpenAI (recommended — uses your `az login`, no keys):
       set AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com/
       set AZURE_OPENAI_CHAT_DEPLOYMENT_NAME=<your-chat-deployment>   # e.g. gpt-4o
       # optional: set AZURE_OPENAI_API_VERSION=2024-10-21
-
-  OpenAI:
-      set OPENAI_API_KEY=sk-...
-      set OPENAI_MODEL=gpt-4o           # optional, defaults to gpt-4o
 
 MCP endpoint (defaults to the deployed Container App):
       set BILLING_MCP_URL=https://billing-mock-mcp.lemonisland-dc9bf8c5.uksouth.azurecontainerapps.io/mcp
@@ -85,10 +81,9 @@ unavailable.
 
 
 def build_chat_client():
-    """Create a chat client from environment configuration.
-
-    Prefers Azure OpenAI (token auth via AzureCliCredential); falls back to OpenAI.
-    """
+    """Create an Azure OpenAI chat client authenticated by Azure CLI."""
+    os.environ.pop("AZURE_OPENAI_API_KEY", None)
+    os.environ.pop("OPENAI_API_KEY", None)
     if os.getenv("AZURE_OPENAI_ENDPOINT"):
         from agent_framework.openai import OpenAIChatCompletionClient
         from azure.identity import AzureCliCredential, get_bearer_token_provider
@@ -104,8 +99,6 @@ def build_chat_client():
         # Force Entra ID (CLI) auth — no API keys. Works even when the resource
         # has key-based authentication disabled. Drop any stray key env vars so the
         # OpenAI SDK can't silently fall back to key auth.
-        os.environ.pop("AZURE_OPENAI_API_KEY", None)
-        os.environ.pop("OPENAI_API_KEY", None)
         token_provider = get_bearer_token_provider(
             AzureCliCredential(), "https://cognitiveservices.azure.com/.default"
         )
@@ -116,16 +109,10 @@ def build_chat_client():
         )
         return OpenAIChatCompletionClient(model=deployment, async_client=async_client)
 
-    if os.getenv("OPENAI_API_KEY"):
-        from agent_framework.openai import OpenAIChatClient
-
-        return OpenAIChatClient(model_id=os.getenv("OPENAI_MODEL", "gpt-4o"))
-
     sys.exit(
         "No model configured.\n"
         "  Azure OpenAI:  set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_CHAT_DEPLOYMENT_NAME "
-        "(then `az login`)\n"
-        "  or OpenAI:     set OPENAI_API_KEY"
+        "(then run `az login`)"
     )
 
 

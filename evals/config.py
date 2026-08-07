@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 import yaml
 
 EVALS_ROOT = Path(__file__).resolve().parent
-DEFAULT_JUDGE_DEPLOYMENT = "gpt-5-mini"
+DEFAULT_JUDGE_DEPLOYMENT = "gpt-5.4-mini"
 DEFAULT_JUDGE_API_VERSION = "2024-10-21"
 
 # Judge deployments whose names start with these need is_reasoning_model=True.
@@ -34,6 +34,16 @@ def load_dotenv(path: Path | None = None) -> None:
             continue
         key, _, value = line.partition("=")
         os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+
+def enforce_azure_cli_auth() -> None:
+    """Prevent Azure/OpenAI SDKs from silently selecting key authentication."""
+    if os.environ.get("EVAL_JUDGE_API_KEY"):
+        raise ValueError(
+            "EVAL_JUDGE_API_KEY is not supported. Run 'az login' and use Azure CLI authentication."
+        )
+    os.environ.pop("AZURE_OPENAI_API_KEY", None)
+    os.environ.pop("OPENAI_API_KEY", None)
 
 
 def _derive_judge_endpoint(project_endpoint: str) -> str:
@@ -123,7 +133,6 @@ class EvalConfig:
     judge_deployment: str = DEFAULT_JUDGE_DEPLOYMENT
     judge_endpoint: str = ""
     judge_api_version: str = DEFAULT_JUDGE_API_VERSION
-    judge_api_key: str | None = None
     upload_to_foundry: bool = True
     use_judges: bool = True
     use_safety: bool = True
@@ -144,6 +153,7 @@ class EvalConfig:
         use_safety: bool = True,
     ) -> "EvalConfig":
         load_dotenv()
+        enforce_azure_cli_auth()
         selected_team = team_dir or os.environ.get("EVAL_TEAM_DIR")
         if not selected_team:
             raise ValueError("Select a team with --team or EVAL_TEAM_DIR.")
@@ -161,9 +171,10 @@ class EvalConfig:
                 judge_deployment
                 or os.environ.get("EVAL_JUDGE_DEPLOYMENT", DEFAULT_JUDGE_DEPLOYMENT)
             ),
-            judge_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT", ""),
-            judge_api_version=os.environ.get("AZURE_OPENAI_API_VERSION", DEFAULT_JUDGE_API_VERSION),
-            judge_api_key=os.environ.get("AZURE_OPENAI_API_KEY") or None,
+            judge_endpoint=os.environ.get("EVAL_JUDGE_ENDPOINT", ""),
+            judge_api_version=os.environ.get(
+                "EVAL_JUDGE_API_VERSION", DEFAULT_JUDGE_API_VERSION
+            ),
             upload_to_foundry=upload_to_foundry,
             use_judges=use_judges,
             use_safety=use_safety,
@@ -184,6 +195,4 @@ class EvalConfig:
             "azure_deployment": self.judge_deployment,
             "api_version": self.judge_api_version,
         }
-        if self.judge_api_key:
-            config["api_key"] = self.judge_api_key
         return config

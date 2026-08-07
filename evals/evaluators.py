@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .auth import CachedAzureCliCredential
+
 # Judge name -> azure.ai.evaluation class. Quality judges need a judge model.
 QUALITY_JUDGES = {
     "coherence": "CoherenceEvaluator",
@@ -38,10 +40,9 @@ _REASONING_CAPABLE = set(QUALITY_JUDGES)
 
 def build_local_judges(config, names: list[str]) -> dict[str, Any]:
     import azure.ai.evaluation as aieval  # noqa: PLC0415
-    from azure.identity import DefaultAzureCredential  # noqa: PLC0415
 
     model_config = config.judge_model_config()
-    credential = None
+    credential = CachedAzureCliCredential()
     built: dict[str, Any] = {}
 
     for name in names:
@@ -53,14 +54,17 @@ def build_local_judges(config, names: list[str]) -> dict[str, Any]:
             raise ImportError(f"{class_name} is missing from the installed azure-ai-evaluation")
 
         if name in SAFETY_JUDGES:
-            credential = credential or DefaultAzureCredential()
             built[name] = evaluator(
                 azure_ai_project=config.foundry_project_endpoint, credential=credential
             )
         elif config.judge_is_reasoning_model and name in _REASONING_CAPABLE:
-            built[name] = evaluator(model_config=model_config, is_reasoning_model=True)
+            built[name] = evaluator(
+                model_config=model_config,
+                credential=credential,
+                is_reasoning_model=True,
+            )
         else:
-            built[name] = evaluator(model_config=model_config)
+            built[name] = evaluator(model_config=model_config, credential=credential)
 
     return built
 

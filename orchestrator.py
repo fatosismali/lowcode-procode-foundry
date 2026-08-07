@@ -128,28 +128,53 @@ def load_team(team_yaml: str | Path) -> tuple[Path, dict[str, Any], dict[str, An
     return team_path, team, registry
 
 
-def _create_client(model: str | None):
+async def _close_resource(resource: Any) -> None:
+    close = getattr(resource, "close", None)
+    if close is None:
+        return
+    result = close()
+    if isinstance(result, Awaitable):
+        await result
+
+
+def _register_client_resources(
+    stack: AsyncExitStack, client: Any, credential: AzureCliCredential
+) -> None:
+    stack.push_async_callback(_close_resource, credential)
+    seen = {id(credential)}
+    for resource_name in ("project_client", "client"):
+        resource = getattr(client, resource_name, None)
+        if resource is not None and id(resource) not in seen:
+            seen.add(id(resource))
+            stack.push_async_callback(_close_resource, resource)
+
+
+def _create_client(stack: AsyncExitStack, model: str | None):
     credential = AzureCliCredential()
     foundry_endpoint = os.getenv("FOUNDRY_PROJECT_ENDPOINT")
     default_model = os.getenv("FOUNDRY_MODEL", "gpt-5")
     if foundry_endpoint:
-        return FoundryChatClient(
+        client = FoundryChatClient(
             project_endpoint=foundry_endpoint,
             model=model or default_model,
             credential=credential,
         )
+        _register_client_resources(stack, client, credential)
+        return client
 
     azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
     if azure_openai_endpoint:
         from agent_framework.openai import OpenAIChatCompletionClient
 
-        return OpenAIChatCompletionClient(
+        client = OpenAIChatCompletionClient(
             model=model or default_model,
             azure_endpoint=azure_openai_endpoint,
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21"),
             credential=credential,
             api_key=None,
         )
+        _register_client_resources(stack, client, credential)
+        return client
 
     raise RuntimeError(
         "No chat endpoint configured. Set FOUNDRY_PROJECT_ENDPOINT in the team's .env file."
@@ -193,7 +218,7 @@ async def _build_agent(
                 )
 
     return Agent(
-        client=_create_client(definition.get("model")),
+        client=_create_client(stack, definition.get("model")),
         name=name,
         description=(
             agent_definition.get("description")
@@ -220,6 +245,7 @@ def _wire_workflow(
         return SequentialBuilder(
             participants=participants,
             chain_only_agent_responses=chain_only,
+            intermediate_output_from="all_other",
         ).build()
     if pattern == "concurrent":
         return ConcurrentBuilder(participants=participants).build()
@@ -296,15 +322,19 @@ async def _run_workflow(workflow, task: str) -> str:
     outputs = events.get_outputs()
     if not outputs:
         return ""
-    final = outputs[-1]
-    messages = getattr(final, "messages", None)
+    return _format_workflow_output(outputs[-1])
+
+
+def _format_workflow_output(output: object) -> str:
+    """Convert an Agent Framework workflow output to display text."""
+    messages = getattr(output, "messages", None)
     if messages:
         return "\n".join(
             f"[{message.author_name or 'assistant'}] {message.text}"
             for message in messages
             if (message.text or "").strip()
         )
-    return str(final)
+    return str(output)
 
 
 async def run_team(team_yaml: str | Path, task: str | None = None) -> str:

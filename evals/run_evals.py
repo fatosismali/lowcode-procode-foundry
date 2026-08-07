@@ -14,9 +14,10 @@ import argparse
 import json
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import yaml
@@ -136,9 +137,15 @@ def judge_items(items: list[dict[str, Any]], judges: dict[str, Any], workers: in
     tasks = [(item, name, judge) for item in items for name, judge in judges.items()]
     print(f"  judging {len(tasks)} row/criterion pairs across {workers} workers...")
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        for item, name, (label, reason) in pool.map(run, tasks):
+        futures = [pool.submit(run, task) for task in tasks]
+        for completed, future in enumerate(as_completed(futures), start=1):
+            item, name, (label, reason) = future.result()
             item[f"{name}_result"] = label
             item[f"{name}_reason"] = reason
+            print(
+                f"    [{completed}/{len(tasks)}] {item['id']} / {name}: {label}",
+                flush=True,
+            )
 
 
 def score_locally(
@@ -151,15 +158,21 @@ def score_locally(
     items: list[dict[str, Any]] = []
 
     print(f"  running the team over {len(rows)} rows...")
-    for row in rows:
+    for index, row in enumerate(rows, start=1):
+        row_id = str(row.get("id", ""))
+        print(f"    [{index}/{len(rows)}] {row_id or '<no id>'}: running...", flush=True)
+        started = perf_counter()
         out = target(row)
+        elapsed = perf_counter() - started
         item = build_item(row, out)
         for name, grader in graders.items():
             scores = grader(**GRADER_INPUTS[name](row, out))
             item[f"{name}_result"] = str(scores.get(f"{name}_result", "not applicable"))
             item[f"{name}_reason"] = str(scores.get(f"{name}_reason", ""))
         if out["error"]:
-            print(f"    ! {row.get('id', '')}: {out['error']}")
+            print(f"      error after {elapsed:.1f}s: {out['error']}", flush=True)
+        else:
+            print(f"      completed in {elapsed:.1f}s", flush=True)
         items.append(item)
 
     if judges:
@@ -201,7 +214,7 @@ def publish(
     config: EvalConfig, items: list[dict[str, Any]], criteria: list[str], set_name: str
 ) -> Any:
     from azure.ai.projects import AIProjectClient  # noqa: PLC0415
-    from azure.identity import DefaultAzureCredential  # noqa: PLC0415
+    from azure.identity import AzureCliCredential  # noqa: PLC0415
     from openai.types.eval_create_params import DataSourceConfigCustom  # noqa: PLC0415
     from openai.types.evals.create_eval_jsonl_run_data_source_param import (  # noqa: PLC0415
         CreateEvalJSONLRunDataSourceParam,
@@ -214,7 +227,7 @@ def publish(
     stamp = f"{datetime.now(timezone.utc):%Y-%m-%d %H:%M}"
 
     with (
-        DefaultAzureCredential() as credential,
+        AzureCliCredential() as credential,
         AIProjectClient(endpoint=config.foundry_project_endpoint, credential=credential) as project,
         project.get_openai_client() as client,
     ):
@@ -268,6 +281,12 @@ def main(argv: list[str] | None = None) -> int:
         default=8,
         help="Parallel judge calls. Lower it if the judge deployment rate limits.",
     )
+    parser.add_argument(
+        "--row-timeout",
+        type=float,
+        default=300.0,
+        help="Maximum seconds for one team execution row (default: 300).",
+    )
     parser.add_argument("--ignore-thresholds", action="store_true", help="Always exit 0.")
     args = parser.parse_args(argv)
 
@@ -293,7 +312,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Project: {config.foundry_project_endpoint}")
     print(f"Judge:   {config.judge_deployment if config.use_judges else 'disabled'}")
 
-    target = TeamTarget(config)
+    if args.row_timeout <= 0:
+        parser.error("--row-timeout must be greater than zero")
+
+    target = TeamTarget(config, row_timeout=args.row_timeout)
     graders = build_graders(suite)
     judges = build_local_judges(config, judge_names) if judge_names else {}
     criteria = [*graders, *judges]

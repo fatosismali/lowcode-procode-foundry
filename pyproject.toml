@@ -17,8 +17,10 @@ keywords = ["agent", "framework", "foundry", "yaml", "orchestration"]
 dependencies = [
     "agent-framework>=1.11.0",
     "azure-identity>=1.14.0",
+    "fastapi>=0.115.0",
     "PyYAML>=6.0",
     "python-dotenv>=1.0.0",
+    "uvicorn>=0.30.0",
 ]
 
 [project.optional-dependencies]

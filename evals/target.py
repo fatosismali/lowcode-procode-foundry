@@ -263,8 +263,9 @@ async def run_team_traced(task: str, orchestrator, team_config) -> TeamResult:
 class TeamTarget:
     """Callable passed to evaluate(); one call per dataset row."""
 
-    def __init__(self, config: EvalConfig):
+    def __init__(self, config: EvalConfig, row_timeout: float = 300.0):
         self.config = config
+        self.row_timeout = row_timeout
         self.suite = config.suite
         os.environ["FOUNDRY_PROJECT_ENDPOINT"] = config.foundry_project_endpoint
         self.orchestrator = load_orchestrator(config.team_dir)
@@ -278,7 +279,14 @@ class TeamTarget:
         query = str(row.get("query") or "")
         task = build_task(row, self.sample_task, self.suite.task)
         try:
-            result = asyncio.run(run_team_traced(task, self.orchestrator, self.team_config))
+            result = asyncio.run(
+                asyncio.wait_for(
+                    run_team_traced(task, self.orchestrator, self.team_config),
+                    timeout=self.row_timeout,
+                )
+            )
+        except TimeoutError:
+            result = TeamResult(error=f"Team execution timed out after {self.row_timeout:g}s")
         except Exception as exc:  # one bad row must not kill the whole run
             result = TeamResult(error=f"{type(exc).__name__}: {exc}")
 

@@ -1,0 +1,6 @@
+# Flask chat UI for the Orchestrator HTTP endpoint.
+flask
+# Server-side proxy calls to the orchestrator /chat endpoint.
+requests
+# Production WSGI server used by the Docker image.
+gunicorn

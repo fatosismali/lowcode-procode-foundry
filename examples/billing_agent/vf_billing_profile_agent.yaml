@@ -91,26 +91,9 @@ definition:
     effort: low
 
   tools:
-    - type: function
-      name: get_billing_profiles
-      description: |
-        Retrieve the customer's available billing profiles. Returns a list of
-        accounts with accountNo, billingProfileId, accountName, accountType,
-        currency and billingAddress, along with a status object containing
-        httpStatus. This is the only tool this agent may call.
-      parameters:
-        type: object
-        properties:
-          selectedAccountReference:
-            type: string
-            description: |
-              Optional. A stable account reference chosen by the customer in a
-              previous turn (e.g. "personal", "business", "acct-ending-4321",
-              or a full account name). When provided, the resolver will match
-              this against the returned profiles.
-        required:
-          - selectedAccountReference
-        additionalProperties: false
-      strict: true
+    - type: mcp
+      server_label: billing_mock
+      server_url: https://billing-mock-mcp.lemonisland-dc9bf8c5.uksouth.azurecontainerapps.io/mcp
+      project_connection_id: billing-mock-mcp
 
 status: active

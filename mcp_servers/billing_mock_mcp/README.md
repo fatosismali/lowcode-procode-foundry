@@ -17,6 +17,7 @@ same response envelope the workflow reads:
 | MCP tool | Upstream API | Returns |
 | --- | --- | --- |
 | `get_billing_profiles` | `getBillingProfiles` | `output.billProfileList[]` — drives single- vs multi-account journeys |
+| `get_billing_data` | Consolidated workflow tool | current bill, previous bills, and subscriptions keyed by requested data type |
 | `get_month_bill_summary` | `getMonthBillSummary` | total, `billStatus`, `billType`, `billMonth`, date range, in/out-of-plan charges, payment message |
 | `get_previous_bills` | `getPreviousBills` | previous bill summaries + billed subscriptions |
 | `get_subscription_details` | `getSubscriptionDetails` | per-subscription plan, allowances, add-ons, out-of-plan charges |
@@ -77,8 +78,8 @@ python agent_client.py "What billing accounts do I have?"
 python agent_client.py
 ```
 
-Point it at a different MCP server with `BILLING_MCP_URL`. OpenAI users can set `OPENAI_API_KEY`
-(and optionally `OPENAI_MODEL`) instead of the Azure variables.
+Point it at a different MCP server with `BILLING_MCP_URL`. Model authentication
+always uses the active Azure CLI session; API keys are not supported.
 
 Example:
 
