@@ -19,6 +19,7 @@ from agent_framework import (
     MCPStreamableHTTPTool,
     Message,
 )
+from agent_framework.azure import CosmosHistoryProvider
 from agent_framework.foundry import FoundryChatClient
 from agent_framework.orchestrations import (
     ConcurrentBuilder,
@@ -27,6 +28,7 @@ from agent_framework.orchestrations import (
     HandoffBuilder,
     SequentialBuilder,
 )
+from agent_framework.redis import RedisContextProvider
 from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
 
@@ -185,6 +187,54 @@ def _create_client(stack: AsyncExitStack, model: str | None):
     )
 
 
+def _build_context_providers(agent_name: str) -> list[Any]:
+    """Create durable conversation history and memory providers from environment settings."""
+    providers: list[Any] = []
+
+    cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")
+    cosmos_database = os.getenv("AZURE_COSMOS_DATABASE_NAME")
+    cosmos_container = os.getenv("AZURE_COSMOS_CONTAINER_NAME")
+    cosmos_key = os.getenv("AZURE_COSMOS_KEY")
+    if cosmos_endpoint and cosmos_database and cosmos_container and cosmos_key:
+        providers.append(
+            CosmosHistoryProvider(
+                source_id=f"cosmos_history_{agent_name}",
+                endpoint=cosmos_endpoint,
+                database_name=cosmos_database,
+                container_name=cosmos_container,
+                credential=cosmos_key,
+                load_messages=True,
+                store_outputs=True,
+                store_inputs=True,
+            )
+        )
+    else:
+        logger.info(
+            "Cosmos history provider not configured for agent '%s'; expected AZURE_COSMOS_ENDPOINT, "
+            "AZURE_COSMOS_DATABASE_NAME, AZURE_COSMOS_CONTAINER_NAME, and AZURE_COSMOS_KEY.",
+            agent_name,
+        )
+
+    redis_url = os.getenv("REDIS_URL") or os.getenv("AZURE_REDIS_CONNECTION_STRING")
+    if redis_url:
+        providers.append(
+            RedisContextProvider(
+                source_id=f"redis_memory_{agent_name}",
+                redis_url=redis_url,
+                agent_id=agent_name,
+                context_prompt="## Memories\nConsider the following memories when answering user questions:",
+            )
+        )
+    else:
+        logger.info(
+            "Redis memory provider not configured for agent '%s'; expected REDIS_URL or "
+            "AZURE_REDIS_CONNECTION_STRING.",
+            agent_name,
+        )
+
+    return providers
+
+
 async def _build_agent(
     stack: AsyncExitStack,
     agent_definition: dict[str, Any],
@@ -231,6 +281,7 @@ async def _build_agent(
         ),
         instructions=definition.get("instructions", ""),
         tools=tools,
+        context_providers=_build_context_providers(name),
         middleware=[ReasoningSafeHandoffMiddleware(agent_name=name)],
     )
 
