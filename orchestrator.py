@@ -107,7 +107,7 @@ def _load_tools_module(path: Path) -> ModuleType:
 
 
 def load_team(team_yaml: str | Path) -> tuple[Path, dict[str, Any], dict[str, Any]]:
-    """Load a team document and its Python tool registry."""
+    """Load a team document and its optional Python tool registry."""
     team_path = Path(team_yaml).resolve()
     if not team_path.is_file():
         raise FileNotFoundError(f"Team YAML not found: {team_path}")
@@ -120,7 +120,11 @@ def load_team(team_yaml: str | Path) -> tuple[Path, dict[str, Any], dict[str, An
     env_file = _resolve_path(team_path.parent, runtime.get("env_file", ".env"))
     load_dotenv(env_file, override=False)
 
-    tools_file = _resolve_path(team_path.parent, runtime.get("tools_file", "src/tools.py"))
+    tools_value = runtime.get("tools_file")
+    if not tools_value:
+        return team_path, team, {}
+
+    tools_file = _resolve_path(team_path.parent, tools_value)
     tools_module = _load_tools_module(tools_file)
     registry = getattr(tools_module, "TOOL_REGISTRY", None)
     if not isinstance(registry, dict):
@@ -319,21 +323,54 @@ async def open_team(team_yaml: str | Path):
 
 async def _run_workflow(workflow, task: str) -> str:
     events = await workflow.run(task)
-    outputs = events.get_outputs()
-    if not outputs:
-        return ""
-    return _format_workflow_output(outputs[-1])
+    candidates = [
+        *reversed(events.get_outputs()),
+        *reversed(events.get_intermediate_outputs()),
+    ]
+    for candidate in candidates:
+        text = _format_workflow_output(candidate)
+        if text.strip():
+            return text
+    return ""
 
 
 def _format_workflow_output(output: object) -> str:
     """Convert an Agent Framework workflow output to display text."""
     messages = getattr(output, "messages", None)
     if messages:
-        return "\n".join(
-            f"[{message.author_name or 'assistant'}] {message.text}"
-            for message in messages
-            if (message.text or "").strip()
-        )
+        for message in reversed(messages):
+            role = getattr(message.role, "value", message.role)
+            if role != "assistant":
+                continue
+
+            text = getattr(message, "text", None)
+            if isinstance(text, str) and text.strip():
+                return f"[{message.author_name or 'assistant'}] {text}"
+
+            contents = getattr(message, "contents", None) or []
+            text_parts: list[str] = []
+            for content in contents:
+                if isinstance(content, dict):
+                    content_type = str(content.get("type", ""))
+                    if content_type in {"function_call", "function_result", "text_reasoning"}:
+                        continue
+                    candidate = content.get("text")
+                    if isinstance(candidate, str) and candidate.strip():
+                        text_parts.append(candidate)
+                elif hasattr(content, "type"):
+                    content_type = str(getattr(content, "type", ""))
+                    if content_type in {"function_call", "function_result", "text_reasoning"}:
+                        continue
+                    candidate = getattr(content, "text", None)
+                    if isinstance(candidate, str) and candidate.strip():
+                        text_parts.append(candidate)
+                elif isinstance(content, str) and content.strip():
+                    text_parts.append(content)
+
+            combined = " ".join(part.strip() for part in text_parts if part.strip())
+            if combined:
+                return f"[{message.author_name or 'assistant'}] {combined}"
+        return ""
     return str(output)
 
 

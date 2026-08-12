@@ -72,7 +72,7 @@ async def test_client_resources_close_with_workflow_stack():
                 "vf-billing-investigation-agent",
                 "vf-billing-response-agent",
             ],
-            {"get_billing_profiles", "get_billing_data"},
+            set(),
         ),
         (
             "agent_teams/vf_triage_team/team.yaml",
@@ -145,6 +145,65 @@ def test_sequential_workflow_passes_only_prior_agent_response(monkeypatch):
         "chain_only_agent_responses": True,
         "intermediate_output_from": "all_other",
     }
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_falls_back_to_last_intermediate_response():
+    final_response = SimpleNamespace(
+        messages=[
+            Message(role="tool", contents=["raw tool result"]),
+            Message(role="assistant", contents=["final response"]),
+        ]
+    )
+
+    class Events:
+        def get_outputs(self):
+            return []
+
+        def get_intermediate_outputs(self):
+            return [SimpleNamespace(messages=[]), final_response]
+
+    class Workflow:
+        async def run(self, task):
+            assert task == "billing request"
+            return Events()
+
+    result = await orchestrator._run_workflow(Workflow(), "billing request")
+
+    assert result == "[assistant] final response"
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_ignores_tool_and_reasoning_content_and_keeps_final_assistant_text():
+    final_response = SimpleNamespace(
+        messages=[
+            Message(
+                role="assistant",
+                author_name="profile-agent",
+                contents=[
+                    {"type": "function_result", "name": "get_billing_data", "result": {"status": 200}},
+                    {"type": "text_reasoning", "text": "I confirmed the billing profile."},
+                    {"type": "text", "text": "Your latest bill is £45.20 and is pending."},
+                ],
+            )
+        ]
+    )
+
+    class Events:
+        def get_outputs(self):
+            return []
+
+        def get_intermediate_outputs(self):
+            return [SimpleNamespace(messages=[]), final_response]
+
+    class Workflow:
+        async def run(self, task):
+            assert task == "billing request"
+            return Events()
+
+    result = await orchestrator._run_workflow(Workflow(), "billing request")
+
+    assert result == "[profile-agent] Your latest bill is £45.20 and is pending."
 
 
 @pytest.mark.asyncio
